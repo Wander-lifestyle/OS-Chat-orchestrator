@@ -40,14 +40,14 @@ Layer 1: Agents (Intelligence + Orchestration)
 
 Layer 2: MCP Protocol (The Bridge)
 - brief-mcp-route.ts (Brief Engine <-> Claude)
-- light-dam-mcp-route.ts (DAM <-> Claude)
+- cloudinary-mcp-route.ts (Cloudinary DAM <-> Claude)
 - ledger-mcp-route.ts (Ledger <-> Claude)
 - [Custom MCP routes] (Any Vercel app)
 - .claude/mcp.json (Registration)
 
 Layer 3: Tools (Stateless Infrastructure)
 - os-brief (Brief Engine, Vercel)
-- light-dam (Asset Management, Vercel)
+- Cloudinary (Asset Management, SaaS)
 - campaign-ledger (State Tracking, Vercel)
 - beehiiv (Newsletter Execution, External API)
 - buffer (Social Scheduling, External API)
@@ -55,6 +55,69 @@ Layer 3: Tools (Stateless Infrastructure)
 
 The MCP Protocol is the genius: It converts stateless Vercel tools into
 Claude-native capabilities.
+
+## Simplified Build Path (Single App)
+
+This is the non-brittle path to the vision. One app, one database, one gateway.
+You still get the multi-agent feel, but without inter-app failures.
+
+### The Rule
+- One deployment (single app)
+- One database (ledger + briefs + learned patterns)
+- One MCP gateway (internal dispatch, not network calls)
+- Agents are prompt roles inside the app, not separate services
+- Cloudinary is the DAM (search + assets)
+
+### Phase 1: The Magic Demo (fast, stable)
+- Chat UI works
+- Orchestrator + agents run inside the same app
+- Brief + copy + assets are generated in-app
+- Ledger updated in the same database
+- No external API calls required
+
+### Phase 2: Real Execution (copy + assets + schedule)
+- Keep single app
+- Add Cloudinary search (real assets)
+- Add ONE scheduling API (Beehiiv or Buffer)
+- Drafts created, assets attached, and scheduled in one flow
+  - Scheduling can run in "draft" mode until keys are live
+
+### Phase 3: Full Autonomy (Levels 4-5)
+- Add background jobs (48hr tracking + weekly report)
+- Pull metrics from Beehiiv/Buffer
+- Update learned patterns
+- Generate VP report automatically
+
+This preserves the vision and removes brittle dependencies.
+
+## Day One Magic Demo Flow (exact user experience)
+
+Goal: a user types one command and sees a full campaign appear in the chat.
+
+**User prompt:**
+```
+Launch campaign for Europe eSIM with newsletter and social
+```
+
+**System steps (visible as progress):**
+1. Analyze campaign request (channels + audience)
+2. Create brief (auto-generated)
+3. Draft newsletter copy + social posts
+4. Search Cloudinary for assets
+5. Schedule in Beehiiv or Buffer (or mark "ready to schedule")
+6. Update ledger
+
+**Assistant response (what feels magical):**
+```
+Brief: BRF-2026-001
+Newsletter: Draft ready (subject + body)
+Social: 3 posts drafted
+Assets: 3 images attached from Cloudinary
+Scheduling: Ready (or scheduled with link)
+Next steps: Approve copy and confirm schedule
+```
+
+This is the minimum "wow" without any brittle architecture.
 
 ## How It Works: The Campaign Loop
 
@@ -79,7 +142,7 @@ What happens (automatically):
 4. CLAUDE hands off to dam-agent.
 5. dam-agent (Claude Code) calls MCP:
    ```
-   calls light-dam/api/mcp via MCP
+   calls cloudinary/api/mcp via MCP
    searchassets(query: "Europe travel lifestyle", channels: ["email", "social"])
    Returns: 5 recommended images with usage rights
    ```
@@ -196,7 +259,7 @@ For any client:
 
 ### Week 1: Deploy base OS
 - os-brief + brief-specialist
-- light-dam + dam-agent
+- Cloudinary + dam-agent
 - campaign-ledger + orchestrator
 - newsletter-agent + social-engine
 - Fully functional Editorial OS in 1 week
@@ -289,7 +352,7 @@ Year 1 target: 10 Level 3-4 customers, 3 Level 5 pilots -> $50-80k MRR
 - Test: @brief-specialist create brief for Europe eSIM launch
 
 ### Week 2
-- Deploy light-dam with MCP route
+- Connect Cloudinary with MCP route
 - Deploy campaign-ledger with MCP route
 - Install dam-agent + ledger agent
 - Wire newsletter-agent to read/write ledger
