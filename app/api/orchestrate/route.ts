@@ -109,7 +109,7 @@ async function callLedgerAPI(action: string, data: any = {}) {
       },
       body: JSON.stringify({
         action,
-        ...data, // Spread the data directly instead of nesting
+        data, // Nest data properly
       }),
     });
 
