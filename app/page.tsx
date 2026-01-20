@@ -291,7 +291,7 @@ Just tell me what you need - I'll orchestrate everything behind the scenes.`,
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-slate-600">Connected</span>
+              <span className="text-sm text-slate-600">Single-app mode</span>
             </div>
           </div>
         </div>
@@ -399,7 +399,7 @@ Just tell me what you need - I'll orchestrate everything behind the scenes.`,
             {/* Footer */}
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500">
-                Connected to Brief Engine • Campaign Ledger • Light DAM
+                Orchestrator • Cloudinary DAM • Beehiiv/Buffer (optional)
               </p>
             </div>
           </div>
