@@ -7,9 +7,30 @@ import { NextRequest, NextResponse } from 'next/server';
 // =============================================================================
 // REAL API ENDPOINTS (from your actual deployments)
 // =============================================================================
-const BRIEF_ENGINE_URL = 'https://os-brief.vercel.app';
-const LEDGER_URL = 'https://os-ledger-v2.vercel.app';
-const DAM_URL = 'https://os-dam.vercel.app'; // Add when ready
+const resolveBaseUrl = (...candidates: Array<string | undefined>) => {
+  const value =
+    candidates.find(
+      (candidate) => typeof candidate === 'string' && candidate.trim().length > 0
+    ) ?? '';
+  return value.replace(/\/+$/, '');
+};
+
+const BRIEF_ENGINE_URL = resolveBaseUrl(
+  process.env.BRIEF_ENGINE_URL,
+  process.env.NEXT_PUBLIC_BRIEF_ENGINE_URL,
+  'https://os-brief.vercel.app'
+);
+const LEDGER_URL = resolveBaseUrl(
+  process.env.LEDGER_URL,
+  process.env.NEXT_PUBLIC_LEDGER_URL,
+  process.env.NEXT_PUBLIC_CAMPAIGN_DECK_URL,
+  'https://os-ledger-v3.vercel.app'
+);
+const DAM_URL = resolveBaseUrl(
+  process.env.DAM_URL,
+  process.env.NEXT_PUBLIC_LIGHT_DAM_URL,
+  'https://os-dam.vercel.app'
+); // Add when ready
 
 // =============================================================================
 // ORCHESTRATION TYPES (matches your real APIs)
@@ -194,7 +215,7 @@ export async function POST(request: NextRequest) {
           step: 'Creating campaign ledger entry',
           status: 'complete',
           details: `Ledger entry ${ledgerResult.data.ledger_id} created`,
-          link: `${LEDGER_URL}/ledger/${ledgerResult.data.ledger_id}`,
+          link: `${LEDGER_URL}/campaign/${ledgerResult.data.ledger_id}`,
           timing: '0.8s'
         };
       } else {

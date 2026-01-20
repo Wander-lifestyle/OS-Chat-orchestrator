@@ -44,8 +44,9 @@ npm run dev
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
+| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://os-brief.vercel.app` |
+| `NEXT_PUBLIC_LEDGER_URL` | Campaign Ledger deployment URL | `https://os-ledger-v3.vercel.app` |
+| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Legacy Campaign Deck URL (fallback) | `https://campaign-ledger.vercel.app` |
 | `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
 
 ## Deploy to Vercel
@@ -79,7 +80,8 @@ vercel --prod
 2. Navigate to **Settings** → **Environment Variables**
 3. Add each variable:
    - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
+   - `NEXT_PUBLIC_LEDGER_URL` = your Campaign Ledger URL
+   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = legacy Campaign Deck URL (optional)
    - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
 
 ## How It Works
@@ -93,8 +95,8 @@ vercel --prod
 
 | Module | Purpose | URL |
 |--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
+| Brief Engine | Create structured campaign briefs | `os-brief.vercel.app` |
+| Campaign Ledger | Track campaign lifecycle | `os-ledger-v3.vercel.app` |
 | Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
 
 ## Example Queries
