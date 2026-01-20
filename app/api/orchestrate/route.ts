@@ -1,4 +1,4 @@
-// EDITORIAL OS - Master Orchestrator API (PRODUCTION GRADE)
+// EDITORIAL OS - Master Orchestrator API (FIXED VERSION)
 // File: /app/api/orchestrate/route.ts in your os-chat app
 // Handles all AI conversations and orchestrates MCP calls
 
@@ -97,9 +97,11 @@ function extractCampaignDetails(message: string) {
   return details;
 }
 
-// Call your actual Ledger API
+// Call your actual Ledger API - FIXED VERSION
 async function callLedgerAPI(action: string, data: any = {}) {
   try {
+    console.log('Calling Ledger API:', action, data);
+    
     const response = await fetch(`${SERVICES.LEDGER}/api/mcp`, {
       method: 'POST',
       headers: {
@@ -107,15 +109,20 @@ async function callLedgerAPI(action: string, data: any = {}) {
       },
       body: JSON.stringify({
         action,
-        data,
+        ...data, // Spread the data directly instead of nesting
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Ledger API error:', response.status, errorText);
       throw new Error(`Ledger API error: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('Ledger API response:', result);
+    return result;
+    
   } catch (error) {
     console.error('Ledger API call failed:', error);
     throw error;
@@ -197,7 +204,7 @@ async function orchestrateCampaignLaunch(message: string): Promise<Orchestration
       timing: '1.2s',
     };
 
-    // Step 3: Create ledger entry
+    // Step 3: Create ledger entry - FIXED FORMAT
     progress.push({
       step: 'Creating campaign ledger entry',
       status: 'running',
@@ -206,17 +213,17 @@ async function orchestrateCampaignLaunch(message: string): Promise<Orchestration
 
     const ledgerResult = await callLedgerAPI('create_campaign', {
       project_name: campaignDetails.name,
-      brief_id: briefResult.brief_id,
-      owner: { name: 'User', email: 'user@example.com' },
+      owner_name: 'User',
+      owner_email: 'user@example.com',
       channels: campaignDetails.channels,
-      status: 'intake',
+      brief_id: briefResult.brief_id,
     });
 
     progress[2] = {
       ...progress[2],
       status: ledgerResult.success ? 'complete' : 'error',
-      details: ledgerResult.success ? `Campaign ${ledgerResult.data?.ledger_id} tracked` : 'Ledger creation failed',
-      link: `${SERVICES.LEDGER}/campaign/${ledgerResult.data?.ledger_id}`,
+      details: ledgerResult.success ? `Campaign ${ledgerResult.data?.ledger_id || 'ID'} tracked` : 'Ledger creation failed',
+      link: ledgerResult.success ? `${SERVICES.LEDGER}/campaign/${ledgerResult.data?.ledger_id}` : undefined,
       timing: '1.8s',
     };
 
@@ -248,7 +255,7 @@ async function orchestrateCampaignLaunch(message: string): Promise<Orchestration
       assets_found: damResult.assets_found,
       manual_links: {
         brief: briefResult.url,
-        ledger: `${SERVICES.LEDGER}/campaign/${ledgerResult.data?.ledger_id}`,
+        ledger: ledgerResult.success ? `${SERVICES.LEDGER}/campaign/${ledgerResult.data?.ledger_id}` : SERVICES.LEDGER,
         dam: damResult.url,
       },
       next_steps: [
