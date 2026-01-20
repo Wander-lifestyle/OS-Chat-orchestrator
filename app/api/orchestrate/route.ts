@@ -213,8 +213,8 @@ async function orchestrateCampaignLaunch(message: string): Promise<Orchestration
 
     const ledgerResult = await callLedgerAPI('create_campaign', {
       project_name: campaignDetails.name,
-      owner_name: 'User',
-      owner_email: 'user@example.com',
+      owner: 'User',
+      email: 'user@editorialos.com',
       channels: campaignDetails.channels,
       brief_id: briefResult.brief_id,
     });
