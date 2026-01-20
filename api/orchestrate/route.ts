@@ -41,7 +41,7 @@ interface OrchestrationResponse {
 // Your deployed service URLs
 const SERVICES = {
   BRIEF_ENGINE: 'https://os-brief.vercel.app',
-  LEDGER: 'https://os-ledger-v2.vercel.app',
+  LEDGER: 'https://os-ledger-v3.vercel.app',
   DAM: 'https://light-dam-v1-ezq22rej5-rogers-projects-9192c0ca.vercel.app',
 };
 
@@ -107,7 +107,7 @@ async function callLedgerAPI(action: string, data: any = {}) {
       },
       body: JSON.stringify({
         action,
-        data,
+params: data,
       }),
     });
 
