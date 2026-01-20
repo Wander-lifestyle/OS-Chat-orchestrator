@@ -159,20 +159,14 @@ export async function POST(request: NextRequest) {
     let ledgerCreated = false;
     
     try {
-      // Use your EXACT MCP format from the real API
+      // Use the EXACT format that works in the browser test
       const ledgerData = {
         action: 'create_campaign',
         params: {
           project_name: campaignDetails.name,
-          brief_id: briefResult?.brief?.brief_id || null,
           owner_name: 'User',
-          owner_email: 'user@editorialos.com',
-          channels: campaignDetails.channels,
-          metadata: {
-            created_via: 'orchestrator',
-            campaign_type: campaignDetails.type || 'general',
-            objectives: campaignDetails.objectives
-          }
+          owner_email: 'user@editorialos.com'
+          // Simplified to match the working test - no extra fields
         }
       };
 
