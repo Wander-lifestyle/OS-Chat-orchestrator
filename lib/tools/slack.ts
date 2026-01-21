@@ -1,4 +1,4 @@
-import { NotifySlackInput, SlackResult } from '@/types';
+import { NotifySlackInput, SlackResult } from '@/types/index';
 
 export async function notifySlack(
   input: NotifySlackInput

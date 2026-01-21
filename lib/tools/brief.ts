@@ -1,9 +1,14 @@
-import { supabase, isSupabaseConfigured } from '@/lib/db/client';
-import { CreateBriefInput, BriefResult } from '@/types';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
+import { CreateBriefInput, BriefResult } from '@/types/index';
 import { createCampaign, updateCampaign } from './ledger';
 
 export async function createBrief(input: CreateBriefInput): Promise<BriefResult> {
   if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
     throw new Error('Supabase is not configured');
   }
 

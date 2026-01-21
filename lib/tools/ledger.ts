@@ -1,5 +1,5 @@
-import { supabase, isSupabaseConfigured } from '@/lib/db/client';
-import { CampaignResult, UpdateCampaignInput } from '@/types';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
+import { CampaignResult, UpdateCampaignInput } from '@/types/index';
 
 function generateLedgerId() {
   const random = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -21,6 +21,11 @@ export async function createCampaign(input: {
 
   const ledgerId = generateLedgerId();
   const now = new Date().toISOString();
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('Supabase is not configured');
+  }
+
   const { error } = await supabase.from('campaigns').insert({
     ledger_id: ledgerId,
     project_name: input.project_name,
@@ -44,6 +49,11 @@ export async function updateCampaign(
   input: UpdateCampaignInput
 ): Promise<CampaignResult> {
   if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
     throw new Error('Supabase is not configured');
   }
 

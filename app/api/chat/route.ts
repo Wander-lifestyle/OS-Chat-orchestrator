@@ -3,8 +3,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { tools } from '@/lib/tools/definitions';
 import { executeTool } from '@/lib/tools/executor';
 import { loadAllPrompts } from '@/lib/prompts/loader';
-import { isSupabaseConfigured, supabase } from '@/lib/db/client';
-import { ChatMessage } from '@/types';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
+import { ChatMessage } from '@/types/index';
 
 export const runtime = 'nodejs';
 
@@ -126,6 +126,10 @@ export async function POST(request: NextRequest) {
     const finalMessage = textBlocks.map((block) => block.text).join('\n');
 
     if (isSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return NextResponse.json({ message: finalMessage });
+      }
       const lastUser = messages.filter((msg) => msg.role === 'user').pop();
       if (lastUser) {
         await supabase.from('chat_history').insert({

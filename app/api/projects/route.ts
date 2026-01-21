@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/db/client';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
+    return NextResponse.json({ projects: [] });
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
     return NextResponse.json({ projects: [] });
   }
 

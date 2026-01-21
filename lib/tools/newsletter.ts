@@ -1,10 +1,15 @@
-import { supabase, isSupabaseConfigured } from '@/lib/db/client';
-import { CreateNewsletterInput, NewsletterDraftResult } from '@/types';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
+import { CreateNewsletterInput, NewsletterDraftResult } from '@/types/index';
 
 export async function createNewsletter(
   input: CreateNewsletterInput
 ): Promise<NewsletterDraftResult> {
   if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
     throw new Error('Supabase is not configured');
   }
 

@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { AssetResult, SearchAssetsInput } from '@/types';
+import { AssetResult, SearchAssetsInput } from '@/types/index';
 
 const SAMPLE_ASSETS = [
   {

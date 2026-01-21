@@ -1,5 +1,5 @@
-import { supabase, isSupabaseConfigured } from '@/lib/db/client';
-import { BeehiivResult, ScheduleBeehiivInput } from '@/types';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
+import { BeehiivResult, ScheduleBeehiivInput } from '@/types/index';
 
 const BEEHIIV_API = 'https://api.beehiiv.com/v2';
 
@@ -12,6 +12,11 @@ export async function scheduleBeehiiv(
 
   if (!process.env.BEEHIIV_API_KEY || !process.env.BEEHIIV_PUBLICATION_ID) {
     throw new Error('Beehiiv is not configured');
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('Supabase is not configured');
   }
 
   const { data: draft, error: fetchError } = await supabase
