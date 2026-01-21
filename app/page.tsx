@@ -1,410 +1,278 @@
-// EDITORIAL OS - Chat-First Interface (PRODUCTION GRADE)
-// File: Replace /app/page.tsx in your os-chat app
-// Tested against your actual APIs - no debugging required
-
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Types matching your actual APIs
 interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
-  progress?: ProgressItem[];
-  results?: OrchestrationResult;
 }
 
-interface ProgressItem {
-  step: string;
-  status: 'pending' | 'running' | 'complete' | 'error';
-  details?: string;
-  link?: string;
-  timing?: string;
+interface Project {
+  ledger_id: string;
+  project_name: string;
+  status: string;
+  updated_at: string;
 }
 
-interface OrchestrationResult {
-  success: boolean;
-  campaign_id?: string;
-  brief_created?: boolean;
-  ledger_entry?: string;
-  assets_found?: number;
-  manual_links: {
-    brief?: string;
-    ledger?: string;
-    dam?: string;
-  };
-  next_steps?: string[];
-}
+const STATUS_STYLES: Record<string, string> = {
+  intake: 'bg-yellow-400',
+  active: 'bg-blue-400',
+  scheduled: 'bg-green-400',
+  shipped: 'bg-purple-400',
+  draft: 'bg-zinc-400',
+};
 
 export default function EditorialOSChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
+      id: 'intro',
       role: 'assistant',
-      content: `# Welcome to Editorial OS 🚀
-
-I'm your AI orchestrator for content and communications. I can:
-
-**🎯 Launch Complete Campaigns:**
-• "Launch campaign for Europe eSIM with newsletter and social"
-• "Create Q2 product announcement across all channels"
-
-**📝 Create & Track:**
-• "Create brief for our new feature launch"
-• "Show me active campaigns"
-
-**🔍 Find Assets:**
-• "Find hero images for Instagram posts"
-
-Just tell me what you need - I'll orchestrate everything behind the scenes.`,
-      timestamp: new Date(),
+      content:
+        'Tell me what you want to ship. Example:\n' +
+        '"Create newsletter for this week. Theme: Valentine\'s weekend getaway"',
     },
   ]);
-
   const [input, setInput] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom of messages
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const fetchProjects = useCallback(async () => {
+    setProjectsLoading(true);
+    try {
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      const data = await response.json();
+      setProjects(data.projects || []);
+    } catch (error) {
+      console.error(error);
+      setProjects([]);
+    } finally {
+      setProjectsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    fetchProjects();
+  }, [fetchProjects]);
 
-  // Generate unique message ID
-  const generateMessageId = useCallback(() => {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  }, []);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  // Handle form submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isProcessing) return;
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isSending) return;
 
     const userMessage: Message = {
-      id: generateMessageId(),
+      id: `${Date.now()}-user`,
       role: 'user',
       content: input.trim(),
-      timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
     setInput('');
-    setIsProcessing(true);
+    setIsSending(true);
 
     try {
-      // Call the master orchestrator
-      const response = await fetch('/api/orchestrate', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage.content,
-          conversation_id: 'main-chat',
+          messages: nextMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        throw new Error('Chat request failed');
       }
 
       const data = await response.json();
-
-      // Create assistant response with results
       const assistantMessage: Message = {
-        id: generateMessageId(),
+        id: `${Date.now()}-assistant`,
         role: 'assistant',
-        content: data.response || 'Task completed successfully!',
-        timestamp: new Date(),
-        progress: data.progress || [],
-        results: data.results || null,
+        content: data.message || 'No response received.',
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages([...nextMessages, assistantMessage]);
+      fetchProjects();
     } catch (error) {
-      console.error('Orchestration error:', error);
-      
-      // Add error message
-      const errorMessage: Message = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: `❌ I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}\n\nTry again or check that all services are running.`,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
+      console.error(error);
+      setMessages([
+        ...nextMessages,
+        {
+          id: `${Date.now()}-error`,
+          role: 'assistant',
+          content: 'Something went wrong. Please try again.',
+        },
+      ]);
     } finally {
-      setIsProcessing(false);
+      setIsSending(false);
     }
-  }, [input, isProcessing, generateMessageId]);
+  }, [fetchProjects, input, isSending, messages]);
 
-  // Format timestamp
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  }, []);
-
-  // Render progress items
-  const renderProgress = useCallback((progress: ProgressItem[]) => {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
-        <h4 className="font-semibold text-blue-900 mb-2">🔄 Orchestration Progress</h4>
-        <div className="space-y-2">
-          {progress.map((item, index) => (
-            <div key={index} className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                {item.status === 'complete' && <span className="text-green-600">✓</span>}
-                {item.status === 'running' && <span className="text-blue-600">🔄</span>}
-                {item.status === 'pending' && <span className="text-gray-400">⏳</span>}
-                {item.status === 'error' && <span className="text-red-600">❌</span>}
-              </div>
-              <div className="flex-1">
-                <span className={`font-medium ${
-                  item.status === 'complete' ? 'text-green-800' :
-                  item.status === 'running' ? 'text-blue-800' :
-                  item.status === 'error' ? 'text-red-800' :
-                  'text-gray-600'
-                }`}>
-                  {item.step}
-                </span>
-                {item.details && (
-                  <div className="text-sm text-gray-600 mt-1">{item.details}</div>
-                )}
-                {item.link && (
-                  <a 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
-                  >
-                    View →
-                  </a>
-                )}
-              </div>
-              {item.timing && (
-                <span className="text-xs text-gray-500">{item.timing}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }, []);
-
-  // Render orchestration results
-  const renderResults = useCallback((results: OrchestrationResult) => {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-3">
-        <h4 className="font-semibold text-green-900 mb-3">
-          ✅ {results.success ? 'Orchestration Complete' : 'Partial Success'}
-        </h4>
-        
-        {/* Campaign Summary */}
-        {results.campaign_id && (
-          <div className="mb-3">
-            <span className="font-medium text-green-800">Campaign ID: </span>
-            <code className="bg-green-100 px-2 py-1 rounded text-sm">{results.campaign_id}</code>
-          </div>
-        )}
-
-        {/* Manual Override Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-          {results.manual_links.brief && (
-            <a
-              href={results.manual_links.brief}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">📝</span>
-              <div>
-                <div className="font-medium text-green-900">Brief Engine</div>
-                <div className="text-sm text-green-600">Edit details</div>
-              </div>
-            </a>
-          )}
-          
-          {results.manual_links.ledger && (
-            <a
-              href={results.manual_links.ledger}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">📊</span>
-              <div>
-                <div className="font-medium text-green-900">Campaign Ledger</div>
-                <div className="text-sm text-green-600">Track progress</div>
-              </div>
-            </a>
-          )}
-
-          {results.manual_links.dam && (
-            <a
-              href={results.manual_links.dam}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">🖼️</span>
-              <div>
-                <div className="font-medium text-green-900">Light DAM</div>
-                <div className="text-sm text-green-600">Manage assets</div>
-              </div>
-            </a>
-          )}
-        </div>
-
-        {/* Next Steps */}
-        {results.next_steps && results.next_steps.length > 0 && (
-          <div>
-            <h5 className="font-medium text-green-900 mb-2">Next Steps:</h5>
-            <ul className="list-disc list-inside text-sm text-green-800 space-y-1">
-              {results.next_steps.map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  }, []);
+  const statusCounts = projects.reduce<Record<string, number>>((acc, project) => {
+    const key = project.status || 'draft';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Editorial OS</h1>
-              <p className="text-slate-600">AI-first content operations</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-slate-600">Single-app mode</span>
-            </div>
-          </div>
+    <div className="flex h-screen bg-zinc-950 text-zinc-100">
+      <aside className="w-80 border-r border-zinc-800 bg-zinc-900/70 p-6 flex flex-col">
+        <div className="mb-6">
+          <h1 className="text-lg font-semibold">Editorial OS</h1>
+          <p className="text-sm text-zinc-400">Campaign command center</p>
         </div>
-      </div>
 
-      {/* Chat Container */}
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-[700px] flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-lg px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white ml-4'
-                      : 'bg-slate-50 text-slate-900 mr-4'
+        <div className="mb-6">
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-zinc-500">
+            <span>Status</span>
+            <button
+              onClick={fetchProjects}
+              className="text-zinc-400 hover:text-zinc-200"
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="mt-3 space-y-2 text-sm text-zinc-300">
+            {Object.keys(statusCounts).length === 0 && (
+              <div className="text-zinc-500">No campaigns yet</div>
+            )}
+            {Object.entries(statusCounts).map(([status, count]) => (
+              <div key={status} className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    STATUS_STYLES[status] || 'bg-zinc-500'
                   }`}
-                >
-                  {/* Message Content */}
-                  <div className="prose prose-sm max-w-none">
-                    {message.content.includes('# ') ? (
-                      <div dangerouslySetInnerHTML={{
-                        __html: message.content
-                          .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mb-2">$1</h1>')
-                          .replace(/^## (.+)$/gm, '<h2 class="text-md font-semibold mb-1">$1</h2>')
-                          .replace(/^\*\*🎯 (.+):\*\*$/gm, '<div class="font-semibold text-blue-600 mt-3">🎯 $1:</div>')
-                          .replace(/^\*\*📝 (.+):\*\*$/gm, '<div class="font-semibold text-green-600 mt-3">📝 $1:</div>')
-                          .replace(/^\*\*🔍 (.+):\*\*$/gm, '<div class="font-semibold text-purple-600 mt-3">🔍 $1:</div>')
-                          .replace(/^• (.+)$/gm, '<li class="ml-4">$1</li>')
-                          .replace(/\n\n/g, '<br><br>')
-                          .replace(/\n/g, '<br>')
-                      }} />
-                    ) : (
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                    )}
-                  </div>
-
-                  {/* Progress */}
-                  {message.progress && message.progress.length > 0 && (
-                    <div className="mt-3">
-                      {renderProgress(message.progress)}
-                    </div>
-                  )}
-
-                  {/* Results */}
-                  {message.results && (
-                    <div className="mt-3">
-                      {renderResults(message.results)}
-                    </div>
-                  )}
-
-                  {/* Timestamp */}
-                  <div className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-200' : 'text-slate-500'
-                  }`}>
-                    {formatTimestamp(message.timestamp)}
-                  </div>
-                </div>
+                />
+                <span className="capitalize">{status}</span>
+                <span className="ml-auto text-zinc-500">{count}</span>
               </div>
             ))}
+          </div>
+        </div>
 
-            {/* Loading indicator */}
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-slate-50 rounded-lg px-4 py-3 mr-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    </div>
-                    <span className="text-sm text-slate-600">Orchestrating Editorial OS...</span>
-                  </div>
-                </div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="text-xs uppercase tracking-wide text-zinc-500">
+            Projects
+          </div>
+          <div className="mt-3 space-y-2">
+            {projectsLoading && (
+              <div className="text-sm text-zinc-500">Loading...</div>
+            )}
+            {!projectsLoading && projects.length === 0 && (
+              <div className="text-sm text-zinc-500">
+                No projects found yet
               </div>
             )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Form */}
-          <div className="border-t border-slate-200 p-6">
-            <form onSubmit={handleSubmit} className="flex gap-4">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Launch campaign for Europe eSIM with newsletter and social..."
-                disabled={isProcessing}
-                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-              />
+            {projects.map((project) => (
               <button
-                type="submit"
-                disabled={isProcessing || !input.trim()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium"
+                key={project.ledger_id}
+                onClick={() => setSelectedProjectId(project.ledger_id)}
+                className={`w-full rounded-lg border border-zinc-800 px-3 py-2 text-left text-sm transition ${
+                  selectedProjectId === project.ledger_id
+                    ? 'bg-zinc-800/80'
+                    : 'hover:bg-zinc-800/40'
+                }`}
               >
-                {isProcessing ? 'Processing...' : 'Send'}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-zinc-100">
+                    {project.project_name}
+                  </span>
+                  <span
+                    className={`ml-2 h-2 w-2 rounded-full ${
+                      STATUS_STYLES[project.status] || 'bg-zinc-500'
+                    }`}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  {project.ledger_id} • {project.status}
+                </div>
               </button>
-            </form>
-            
-            {/* Footer */}
-            <div className="text-center mt-3">
-              <p className="text-xs text-slate-500">
-                Orchestrator • Cloudinary DAM • Beehiiv/Buffer (optional)
+            ))}
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex flex-1 flex-col">
+        <div className="border-b border-zinc-800 px-8 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Chat</h2>
+              <p className="text-sm text-zinc-400">
+                Launch campaigns, write, schedule, report.
               </p>
+            </div>
+            <div className="text-xs text-zinc-500">
+              {selectedProjectId ? `Selected: ${selectedProjectId}` : 'No project selected'}
             </div>
           </div>
         </div>
-      </div>
+
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              <div
+                className={`max-w-[75%] rounded-xl px-4 py-3 text-sm ${
+                  message.role === 'user'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+                }`}
+              >
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              </div>
+            </div>
+          ))}
+
+          {isSending && (
+            <div className="flex justify-start">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-400">
+                Working...
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="border-t border-zinc-800 px-8 py-6">
+          <div className="flex items-center gap-4">
+            <input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Create newsletter for this week..."
+              className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={isSending}
+            />
+            <button
+              onClick={handleSend}
+              disabled={isSending || !input.trim()}
+              className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-700"
+            >
+              {isSending ? 'Sending...' : 'Send'}
+            </button>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
