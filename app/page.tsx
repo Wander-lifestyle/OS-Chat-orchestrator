@@ -132,41 +132,44 @@ export default function LightDamPage() {
   return (
     <div className="min-h-screen bg-os-bg text-os-text">
       <div className="gradient-bg">
-        <header className="border-b border-os-border/60">
-          <div className="mx-auto max-w-6xl px-6 py-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <header className="border-b border-black/5 bg-white/80 backdrop-blur-xl">
+          <div className="mx-auto max-w-6xl px-6 py-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-os-muted">Light DAM</p>
-                <h1 className="text-3xl font-semibold">Searchable asset library</h1>
+                <p className="text-[11px] uppercase tracking-[0.3em] text-os-muted">Light DAM</p>
+                <h1 className="text-4xl font-semibold tracking-tight">Searchable asset library</h1>
                 <p className="text-sm text-os-muted">
                   Quick, human-friendly search over your Cloudinary-backed assets.
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-os-muted">
-                <span className="inline-flex items-center gap-2 rounded-full border border-os-border/60 bg-os-surface/60 px-3 py-1">
+                <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1 shadow-sm">
                   <span className={`h-2 w-2 rounded-full ${connectionBadge.color}`} />
                   {connectionBadge.label}
                 </span>
               </div>
             </div>
-            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form
+              onSubmit={handleSubmit}
+              className="mt-6 flex flex-col gap-3 rounded-2xl border border-black/10 bg-white/80 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center"
+            >
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search by campaign, tags, photographer, usage rights, or #image number"
-                className="h-12 flex-1 rounded-xl border border-os-border bg-os-surface px-4 text-sm text-os-text placeholder:text-os-muted focus:border-os-accent focus:outline-none"
+                className="h-12 flex-1 rounded-xl border border-black/10 bg-white px-4 text-sm text-os-text placeholder:text-os-muted shadow-sm focus:border-os-accent focus:outline-none focus:ring-2 focus:ring-os-accent/20"
               />
               <div className="flex items-center gap-2">
                 <button
                   type="submit"
-                  className="h-12 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                  className="h-12 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-os-accent/30"
                 >
                   Search
                 </button>
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="h-12 rounded-xl border border-os-border px-4 text-sm text-os-muted transition hover:text-os-text"
+                  className="h-12 rounded-xl border border-black/10 bg-white px-4 text-sm text-os-muted shadow-sm transition hover:text-os-text"
                 >
                   Clear
                 </button>
@@ -175,7 +178,7 @@ export default function LightDamPage() {
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-os-muted">
               <span>{summary}</span>
               {results.query && (
-                <span className="rounded-full border border-os-border/60 bg-os-surface/60 px-3 py-1">
+                <span className="rounded-full border border-black/10 bg-white px-3 py-1 shadow-sm">
                   Tip: try "image #1234" or "photographer Alex"
                 </span>
               )}
@@ -186,9 +189,9 @@ export default function LightDamPage() {
 
       <main className="mx-auto max-w-6xl px-6 py-8">
         {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/40 bg-red-500/10 px-5 py-4 text-sm text-red-200">
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-sm">
             <div className="font-semibold">Light DAM is not configured yet.</div>
-            <p className="mt-1 text-red-200/80">
+            <p className="mt-1 text-red-600">
               {error}
               {results.missing?.length ? ` Missing: ${results.missing.join(', ')}` : ''}
             </p>
@@ -196,19 +199,19 @@ export default function LightDamPage() {
         )}
 
         {!error && results.assets.length === 0 && !isLoading && (
-          <div className="rounded-2xl border border-os-border bg-os-surface p-8 text-center text-sm text-os-muted">
+          <div className="rounded-2xl border border-black/10 bg-white p-8 text-center text-sm text-os-muted shadow-sm">
             No assets matched that search. Try different keywords or remove filters.
           </div>
         )}
 
         {isLoading && (
-          <div className="rounded-2xl border border-os-border bg-os-surface p-8 text-center text-sm text-os-muted">
+          <div className="rounded-2xl border border-black/10 bg-white p-8 text-center text-sm text-os-muted shadow-sm">
             Searching your library...
           </div>
         )}
 
         {!isLoading && results.assets.length > 0 && (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {results.assets.map((asset) => {
               const photographer = getField(asset, ['photographer', 'creator', 'credit']);
               const usageRights = getField(asset, ['usage_rights', 'rights', 'license']);
@@ -217,9 +220,9 @@ export default function LightDamPage() {
               return (
                 <article
                   key={asset.id}
-                  className="overflow-hidden rounded-2xl border border-os-border bg-os-surface shadow-sm"
+                  className="overflow-hidden rounded-3xl border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="aspect-square w-full overflow-hidden bg-black/20">
+                  <div className="aspect-square w-full overflow-hidden bg-os-bg">
                     <img
                       src={asset.preview_url}
                       alt={description || asset.filename}
@@ -234,7 +237,7 @@ export default function LightDamPage() {
                         <p className="text-xs text-os-muted">{asset.public_id}</p>
                       </div>
                       {asset.format && (
-                        <span className="rounded-full border border-os-border px-2 py-1 text-[10px] uppercase text-os-muted">
+                        <span className="rounded-full border border-black/10 bg-os-bg px-2 py-1 text-[10px] uppercase text-os-muted">
                           {asset.format}
                         </span>
                       )}
@@ -242,19 +245,19 @@ export default function LightDamPage() {
 
                     <div className="grid grid-cols-2 gap-2 text-xs text-os-muted">
                       <div>
-                        <span className="block text-[10px] uppercase text-os-muted/60">Asset #</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-os-muted/70">Asset #</span>
                         <span className="text-os-text">{asset.asset_number || 'N/A'}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase text-os-muted/60">Added</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-os-muted/70">Added</span>
                         <span className="text-os-text">{formatDate(asset.created_at)}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase text-os-muted/60">Size</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-os-muted/70">Size</span>
                         <span className="text-os-text">{formatBytes(asset.bytes)}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] uppercase text-os-muted/60">Dimensions</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-os-muted/70">Dimensions</span>
                         <span className="text-os-text">
                           {asset.width && asset.height ? `${asset.width}x${asset.height}` : 'N/A'}
                         </span>
@@ -264,19 +267,19 @@ export default function LightDamPage() {
                     <div className="space-y-1 text-xs text-os-muted">
                       {campaign && (
                         <div>
-                          <span className="text-[10px] uppercase text-os-muted/60">Campaign</span>
+                          <span className="text-[10px] uppercase tracking-wide text-os-muted/70">Campaign</span>
                           <div className="text-os-text">{campaign}</div>
                         </div>
                       )}
                       {photographer && (
                         <div>
-                          <span className="text-[10px] uppercase text-os-muted/60">Photographer</span>
+                          <span className="text-[10px] uppercase tracking-wide text-os-muted/70">Photographer</span>
                           <div className="text-os-text">{photographer}</div>
                         </div>
                       )}
                       {usageRights && (
                         <div>
-                          <span className="text-[10px] uppercase text-os-muted/60">Usage Rights</span>
+                          <span className="text-[10px] uppercase tracking-wide text-os-muted/70">Usage Rights</span>
                           <div className="text-os-text">{usageRights}</div>
                         </div>
                       )}
@@ -287,7 +290,7 @@ export default function LightDamPage() {
                         {asset.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="rounded-full border border-os-border/60 bg-os-bg/60 px-2 py-1 text-[10px] text-os-muted"
+                            className="rounded-full border border-black/10 bg-os-bg px-2 py-1 text-[10px] text-os-muted"
                           >
                             {tag}
                           </span>
@@ -301,7 +304,7 @@ export default function LightDamPage() {
                           href={asset.secure_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-lg border border-os-border px-3 py-2 text-os-text transition hover:border-os-muted"
+                          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-os-text shadow-sm transition hover:bg-os-bg"
                         >
                           Open
                         </a>
@@ -310,7 +313,7 @@ export default function LightDamPage() {
                         href={asset.download_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-lg bg-os-accent px-3 py-2 text-white transition hover:bg-indigo-500"
+                        className="rounded-lg bg-os-accent px-3 py-2 text-white shadow-sm transition hover:bg-blue-600"
                       >
                         Download
                       </a>
