@@ -428,6 +428,15 @@ export default function LightDamPage() {
                 <span className="text-os-text">AI search</span>
               </label>
               {results.query && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-os-text shadow-sm transition hover:bg-os-bg"
+                >
+                  Clear results
+                </button>
+              )}
+              {results.query && (
                 <span className="rounded-full border border-black/10 bg-white px-3 py-1 shadow-sm">
                   Tip: try "image #1234" or "photographer Alex"
                 </span>
