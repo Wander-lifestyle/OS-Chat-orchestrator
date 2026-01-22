@@ -355,7 +355,7 @@ async function runSearch(request: NextRequest) {
         const score = scoreAsset(toSearchAsset(asset), parsedQuery.terms);
         return score > 0 ? { asset, score } : null;
       })
-      .filter((item): item is { asset: any; score: number } => item !== null);
+      .filter((item: { asset: any; score: number } | null): item is { asset: any; score: number } => item !== null);
     scored.sort((a, b) => b.score - a.score);
     filtered = scored.map((item) => item.asset);
   } else {
