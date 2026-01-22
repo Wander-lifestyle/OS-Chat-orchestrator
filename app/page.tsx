@@ -105,7 +105,7 @@ function normalizeTags(value: CloudinaryUploadResult['tags']) {
 export default function LightDamPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DamSearchResponse>(EMPTY_RESULTS);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [isSemanticSearch, setIsSemanticSearch] = useState(true);
@@ -158,10 +158,6 @@ export default function LightDamPage() {
   }, [isSemanticSearch]);
 
   useEffect(() => {
-    void fetchAssets('');
-  }, [fetchAssets]);
-
-  useEffect(() => {
     if (uploadFiles.length > 1 && uploadFields.assetNumber) {
       setUploadFields((prev) => ({ ...prev, assetNumber: '' }));
     }
@@ -177,13 +173,18 @@ export default function LightDamPage() {
 
   const handleClear = useCallback(() => {
     setQuery('');
-    void fetchAssets('');
-  }, [fetchAssets]);
+    setActiveQuery('');
+    setResults(EMPTY_RESULTS);
+    setIsLoading(false);
+    setError('');
+  }, []);
 
   const handleSearchModeChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.checked;
     setIsSemanticSearch(nextValue);
-    void fetchAssets(activeQuery, nextValue ? 'semantic' : 'strict');
+    if (activeQuery) {
+      void fetchAssets(activeQuery, nextValue ? 'semantic' : 'strict');
+    }
   }, [activeQuery, fetchAssets]);
 
   const addFiles = useCallback((files: File[]) => {
@@ -354,6 +355,9 @@ export default function LightDamPage() {
   const summary = useMemo(() => {
     if (isLoading) return 'Loading assets...';
     if (error) return 'Unable to load assets.';
+    if (!results.query && results.total === 0) {
+      return 'Search to see results.';
+    }
     const base = !results.query
       ? `${results.total} assets available`
       : `${results.total} results for "${results.query}"`;
@@ -409,7 +413,7 @@ export default function LightDamPage() {
                   onClick={handleClear}
                   className="h-12 rounded-xl border border-black/10 bg-white px-4 text-sm text-os-muted shadow-sm transition hover:text-os-text"
                 >
-                  Clear
+                  Clear search
                 </button>
               </div>
             </form>
@@ -427,15 +431,6 @@ export default function LightDamPage() {
                 </span>
                 <span className="text-os-text">AI search</span>
               </label>
-              {results.query && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-os-text shadow-sm transition hover:bg-os-bg"
-                >
-                  Clear results
-                </button>
-              )}
               {results.query && (
                 <span className="rounded-full border border-black/10 bg-white px-3 py-1 shadow-sm">
                   Tip: try "image #1234" or "photographer Alex"
@@ -662,7 +657,7 @@ export default function LightDamPage() {
           </form>
         </section>
 
-        {!error && results.assets.length === 0 && !isLoading && (
+        {!error && results.assets.length === 0 && !isLoading && results.query && (
           <div className="rounded-2xl border border-black/10 bg-white p-8 text-center text-sm text-os-muted shadow-sm">
             No assets matched that search. Try different keywords or remove filters.
           </div>
@@ -807,6 +802,18 @@ export default function LightDamPage() {
                 </article>
               );
             })}
+          </div>
+        )}
+
+        {!isLoading && results.assets.length > 0 && (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="rounded-full border border-black/10 bg-white px-5 py-2 text-sm text-os-text shadow-sm transition hover:bg-os-bg"
+            >
+              Clear search results
+            </button>
           </div>
         )}
       </main>
