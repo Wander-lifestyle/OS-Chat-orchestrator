@@ -324,7 +324,6 @@ async function runSearch(request: NextRequest) {
       { status: 500 },
     );
   }
-  }
 
   const folder = process.env.CLOUDINARY_FOLDER?.trim();
   const folderExpression = folder ? ` AND folder:${escapeExpressionValue(folder)}` : '';
