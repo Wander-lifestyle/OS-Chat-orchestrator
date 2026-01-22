@@ -12,6 +12,8 @@ links.
 - Metadata-driven organization (photographer, usage rights, campaign, asset number)
 - Upload UI with metadata form (asset #, campaign, photographer, usage rights)
 - Optional AI auto-tagging and AI search mode
+- Drag-and-drop + multi-upload support
+- AI tag confidence display (when returned by Cloudinary)
 - Optional folder scoping for multi-team libraries
 
 ## Quick Start

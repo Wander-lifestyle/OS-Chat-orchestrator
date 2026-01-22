@@ -28,6 +28,7 @@ type DamAsset = {
   secure_url?: string;
   preview_url: string;
   download_url: string;
+  ai_tag_confidence?: Record<string, number>;
 };
 
 const DEFAULT_LIMIT = 48;
@@ -196,6 +197,15 @@ function mapAsset(asset: any): DamAsset {
   const filename =
     asset.filename || asset.public_id?.split('/').pop() || asset.public_id;
 
+  const aiTagConfidence = parseTagConfidence(
+    context.ai_tag_confidence ||
+      metadata.ai_tag_confidence ||
+      context.ai_tag_scores ||
+      metadata.ai_tag_scores ||
+      context.ai_tags ||
+      metadata.ai_tags,
+  );
+
   return {
     id: asset.asset_id || asset.public_id,
     public_id: asset.public_id,
@@ -214,6 +224,7 @@ function mapAsset(asset: any): DamAsset {
     secure_url: asset.secure_url,
     preview_url: buildPreviewUrl(asset.public_id),
     download_url: buildDownloadUrl(asset.public_id),
+    ai_tag_confidence: Object.keys(aiTagConfidence).length > 0 ? aiTagConfidence : undefined,
   };
 }
 
@@ -227,6 +238,46 @@ function toSearchAsset(asset: any) {
     metadata: asset.metadata,
     format: asset.format,
   };
+}
+
+function parseTagConfidence(value?: string) {
+  if (!value) return {} as Record<string, number>;
+  const trimmed = value.trim();
+  if (!trimmed) return {} as Record<string, number>;
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, number>;
+      return normalizeConfidenceMap(parsed);
+    } catch {
+      return {} as Record<string, number>;
+    }
+  }
+
+  const entries = trimmed.split(',').map((pair) => pair.trim()).filter(Boolean);
+  const map: Record<string, number> = {};
+  entries.forEach((entry) => {
+    const [tag, scoreRaw] = entry.split(':').map((part) => part.trim());
+    if (!tag || !scoreRaw) return;
+    const score = Number(scoreRaw);
+    if (Number.isNaN(score)) return;
+    map[tag] = normalizeConfidence(score);
+  });
+  return map;
+}
+
+function normalizeConfidenceMap(map: Record<string, number>) {
+  const normalized: Record<string, number> = {};
+  Object.entries(map).forEach(([tag, score]) => {
+    if (typeof score !== 'number' || Number.isNaN(score)) return;
+    normalized[tag] = normalizeConfidence(score);
+  });
+  return normalized;
+}
+
+function normalizeConfidence(score: number) {
+  const normalized = score > 1 ? score / 100 : score;
+  return Math.min(Math.max(normalized, 0), 1);
 }
 
 async function runSearch(request: NextRequest) {

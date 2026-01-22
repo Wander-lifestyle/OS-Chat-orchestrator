@@ -1,6 +1,6 @@
 'use client';
 
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, DragEvent, FormEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type DamAsset = {
@@ -21,6 +21,7 @@ type DamAsset = {
   secure_url?: string;
   preview_url: string;
   download_url: string;
+  ai_tag_confidence?: Record<string, number>;
 };
 
 type DamSearchResponse = {
@@ -36,10 +37,15 @@ type UploadResponse = {
   success?: boolean;
   error?: string;
   missing?: string[];
-  asset?: {
+  uploaded?: number;
+  failed?: number;
+  warnings?: string[];
+  errors?: Array<{ fileName: string; error: string }>;
+  assets?: Array<{
     public_id: string;
     tags?: string[];
-  };
+    ai_tag_confidence?: Record<string, number>;
+  }>;
 };
 
 const EMPTY_RESULTS: DamSearchResponse = {
@@ -87,10 +93,13 @@ export default function LightDamPage() {
   const [error, setError] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [isSemanticSearch, setIsSemanticSearch] = useState(true);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadTags, setUploadTags] = useState<string[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<Array<{ fileName: string; error: string }>>([]);
+  const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [uploadFields, setUploadFields] = useState({
     assetNumber: '',
     photographer: '',
@@ -136,6 +145,12 @@ export default function LightDamPage() {
     void fetchAssets('');
   }, [fetchAssets]);
 
+  useEffect(() => {
+    if (uploadFiles.length > 1 && uploadFields.assetNumber) {
+      setUploadFields((prev) => ({ ...prev, assetNumber: '' }));
+    }
+  }, [uploadFiles.length, uploadFields.assetNumber]);
+
   const handleSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault();
@@ -155,17 +170,58 @@ export default function LightDamPage() {
     void fetchAssets(activeQuery, nextValue ? 'semantic' : 'strict');
   }, [activeQuery, fetchAssets]);
 
-  const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    setUploadFile(file);
+  const addFiles = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+    setUploadFiles((prev) => {
+      const existingKeys = new Set(prev.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+      const nextFiles = files.filter((file) => {
+        if (!file.type.startsWith('image/')) return false;
+        const key = `${file.name}-${file.size}-${file.lastModified}`;
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      });
+      return [...prev, ...nextFiles];
+    });
     setUploadStatus('idle');
     setUploadMessage('');
     setUploadTags([]);
+    setUploadErrors([]);
+    setUploadWarnings([]);
   }, []);
+
+  const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    addFiles(files);
+    if (event.target.value) {
+      event.target.value = '';
+    }
+  }, [addFiles]);
+
+  const removeUploadFile = useCallback((index: number) => {
+    setUploadFiles((prev) => prev.filter((_, idx) => idx !== index));
+  }, []);
+
+  const handleDragOver = useCallback((event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+  }, []);
+
+  const handleDrop = useCallback((event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    const files = Array.from(event.dataTransfer.files ?? []);
+    addFiles(files);
+  }, [addFiles]);
 
   const handleUploadSubmit = useCallback(async (event: FormEvent) => {
     event.preventDefault();
-    if (!uploadFile || uploadStatus === 'uploading') {
+    if (uploadFiles.length === 0 || uploadStatus === 'uploading') {
       setUploadStatus('error');
       setUploadMessage('Select an image before uploading.');
       return;
@@ -174,10 +230,14 @@ export default function LightDamPage() {
     setUploadStatus('uploading');
     setUploadMessage('');
     setUploadTags([]);
+    setUploadErrors([]);
+    setUploadWarnings([]);
 
     try {
       const formData = new FormData();
-      formData.append('file', uploadFile);
+      uploadFiles.forEach((file) => {
+        formData.append('files', file);
+      });
       formData.append('assetNumber', uploadFields.assetNumber);
       formData.append('photographer', uploadFields.photographer);
       formData.append('usageRights', uploadFields.usageRights);
@@ -194,16 +254,27 @@ export default function LightDamPage() {
       if (!response.ok) {
         setUploadStatus('error');
         setUploadMessage(data.error || 'Upload failed.');
+        setUploadErrors(data.errors ?? []);
         return;
       }
 
-      setUploadStatus('success');
-      setUploadMessage('Upload complete. Asset added to your library.');
-      setUploadTags(data.asset?.tags ?? []);
-      setUploadFile(null);
+      const uploaded = data.uploaded ?? data.assets?.length ?? 0;
+      const failed = data.failed ?? 0;
+      if (uploaded > 0) {
+        setUploadStatus('success');
+        setUploadMessage(`Uploaded ${uploaded} asset${uploaded === 1 ? '' : 's'}.${failed ? ` ${failed} failed.` : ''}`);
+      } else {
+        setUploadStatus('error');
+        setUploadMessage(data.error || 'Upload failed.');
+      }
+      const tagList = data.assets?.flatMap((asset) => asset.tags ?? []) ?? [];
+      const uniqueTags = Array.from(new Set(tagList)).slice(0, 12);
+      setUploadTags(uniqueTags);
+      setUploadErrors(data.errors ?? []);
+      setUploadWarnings(data.warnings ?? []);
+      setUploadFiles([]);
       setUploadFields((prev) => ({
         ...prev,
-        assetNumber: '',
         description: '',
         tags: '',
       }));
@@ -222,7 +293,7 @@ export default function LightDamPage() {
     fetchAssets,
     isSemanticSearch,
     uploadFields,
-    uploadFile,
+    uploadFiles,
     uploadStatus,
   ]);
 
@@ -335,19 +406,52 @@ export default function LightDamPage() {
           </div>
 
           <form onSubmit={handleUploadSubmit} className="mt-6 grid gap-5">
-            <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/20 bg-os-bg/60 text-center text-sm text-os-muted">
+            <label
+              className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed bg-os-bg/60 text-center text-sm text-os-muted transition ${
+                dragActive ? 'border-os-accent bg-blue-50/80' : 'border-black/20'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="sr-only"
                 onChange={handleFileChange}
               />
               <span className="text-sm font-medium text-os-text">
-                {uploadFile ? uploadFile.name : 'Drop an image here or click to browse'}
+                {uploadFiles.length > 0
+                  ? `${uploadFiles.length} file${uploadFiles.length === 1 ? '' : 's'} ready`
+                  : 'Drop images here or click to browse'}
               </span>
-              <span className="text-xs text-os-muted">PNG, JPG, or WebP. Recommended under 15MB.</span>
+              <span className="text-xs text-os-muted">PNG, JPG, or WebP. Recommended under 15MB each.</span>
             </label>
+
+            {uploadFiles.length > 0 && (
+              <div className="grid gap-2 text-xs text-os-muted">
+                {uploadFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${file.size}-${file.lastModified}`}
+                    className="flex items-center justify-between rounded-xl border border-black/10 bg-white px-3 py-2 shadow-sm"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-os-text">{file.name}</div>
+                      <div className="text-[11px] text-os-muted">{formatBytes(file.size)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeUploadFile(index)}
+                      className="text-xs text-os-muted hover:text-os-text"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-xs text-os-muted">
@@ -358,8 +462,9 @@ export default function LightDamPage() {
                     ...prev,
                     assetNumber: event.target.value,
                   }))}
-                  placeholder="e.g. 1234"
-                  className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm text-os-text shadow-sm focus:border-os-accent focus:outline-none focus:ring-2 focus:ring-os-accent/20"
+                  placeholder={uploadFiles.length > 1 ? 'Asset # disabled for multi-upload' : 'e.g. 1234'}
+                  disabled={uploadFiles.length > 1}
+                  className="h-11 rounded-xl border border-black/10 bg-white px-3 text-sm text-os-text shadow-sm focus:border-os-accent focus:outline-none focus:ring-2 focus:ring-os-accent/20 disabled:bg-os-bg disabled:text-os-muted"
                 />
               </label>
               <label className="grid gap-2 text-xs text-os-muted">
@@ -443,10 +548,12 @@ export default function LightDamPage() {
               </label>
               <button
                 type="submit"
-                disabled={uploadStatus === 'uploading' || !uploadFile}
+                disabled={uploadStatus === 'uploading' || uploadFiles.length === 0}
                 className="h-11 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-black/20"
               >
-                {uploadStatus === 'uploading' ? 'Uploading...' : 'Upload asset'}
+                {uploadStatus === 'uploading'
+                  ? 'Uploading...'
+                  : `Upload ${uploadFiles.length > 1 ? `${uploadFiles.length} assets` : 'asset'}`}
               </button>
             </div>
 
@@ -463,15 +570,29 @@ export default function LightDamPage() {
                 <div className="font-medium">{uploadMessage}</div>
                 {uploadTags.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {uploadTags.map((tag) => (
+                    {uploadTags.map((tag, index) => (
                       <span
-                        key={tag}
+                        key={`${tag}-${index}`}
                         className="rounded-full border border-black/10 bg-white px-2 py-1 text-[10px] text-os-muted"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
+                )}
+                {uploadErrors.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-red-600">
+                    {uploadErrors.map((item) => (
+                      <li key={`${item.fileName}-${item.error}`}>{item.fileName}: {item.error}</li>
+                    ))}
+                  </ul>
+                )}
+                {uploadWarnings.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-amber-700">
+                    {uploadWarnings.map((warning, index) => (
+                      <li key={`${warning}-${index}`}>{warning}</li>
+                    ))}
+                  </ul>
                 )}
               </div>
             )}
@@ -497,6 +618,9 @@ export default function LightDamPage() {
               const usageRights = getField(asset, ['usage_rights', 'rights', 'license']);
               const campaign = getField(asset, ['campaign', 'project', 'collection']);
               const description = getField(asset, ['description', 'caption', 'alt']);
+              const aiTagEntries = Object.entries(asset.ai_tag_confidence ?? {})
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 4);
               return (
                 <article
                   key={asset.id}
@@ -575,6 +699,24 @@ export default function LightDamPage() {
                             {tag}
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {aiTagEntries.length > 0 && (
+                      <div className="space-y-2 text-xs text-os-muted">
+                        <span className="text-[10px] uppercase tracking-wide text-os-muted/70">
+                          AI tag confidence
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {aiTagEntries.map(([tag, confidence]) => (
+                            <span
+                              key={`${asset.id}-${tag}`}
+                              className="rounded-full border border-black/10 bg-white px-2 py-1 text-[10px] text-os-text"
+                            >
+                              {tag} {Math.round(confidence * 100)}%
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
 
