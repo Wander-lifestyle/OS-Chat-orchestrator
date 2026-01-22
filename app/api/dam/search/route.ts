@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
+type SearchMode = 'strict' | 'semantic';
+
 type DamSearchRequest = {
   query?: string;
   cursor?: string;
   limit?: number;
+  mode?: SearchMode;
 };
 
 type DamAsset = {
@@ -127,6 +130,19 @@ function buildSearchableText(asset: {
   return parts.join(' ').toLowerCase();
 }
 
+function scoreAsset(
+  asset: Parameters<typeof buildSearchableText>[0],
+  terms: string[],
+) {
+  if (terms.length === 0) return 1;
+  const searchable = buildSearchableText(asset);
+  let score = 0;
+  for (const term of terms) {
+    if (searchable.includes(term)) score += 1;
+  }
+  return score / terms.length;
+}
+
 function matchesQuery(
   asset: Parameters<typeof buildSearchableText>[0],
   query: { assetId?: string; terms: string[] },
@@ -201,12 +217,28 @@ function mapAsset(asset: any): DamAsset {
   };
 }
 
+function toSearchAsset(asset: any) {
+  return {
+    asset_id: asset.asset_id,
+    public_id: asset.public_id,
+    filename: asset.filename,
+    tags: asset.tags,
+    context: asset.context,
+    metadata: asset.metadata,
+    format: asset.format,
+  };
+}
+
 async function runSearch(request: NextRequest) {
   const isPost = request.method === 'POST';
   const payload = isPost ? ((await request.json()) as DamSearchRequest) : null;
   const query = payload?.query ?? request.nextUrl.searchParams.get('q') ?? '';
   const cursor =
     payload?.cursor ?? request.nextUrl.searchParams.get('cursor') ?? undefined;
+  const modeParam =
+    payload?.mode ?? (request.nextUrl.searchParams.get('mode') as SearchMode | null);
+  const mode: SearchMode = modeParam === 'semantic' ? 'semantic' : 'strict';
+  const isSemantic = mode === 'semantic';
   const requestedLimit = Number(payload?.limit ?? request.nextUrl.searchParams.get('limit'));
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), MAX_LIMIT)
@@ -260,20 +292,27 @@ async function runSearch(request: NextRequest) {
 
   const result = await searchQuery.execute();
   const parsedQuery = parseQuery(query);
-  const filtered = (result.resources ?? []).filter((asset: any) =>
-    matchesQuery(
-      {
-        asset_id: asset.asset_id,
-        public_id: asset.public_id,
-        filename: asset.filename,
-        tags: asset.tags,
-        context: asset.context,
-        metadata: asset.metadata,
-        format: asset.format,
-      },
-      parsedQuery,
-    ),
-  );
+  const resources = result.resources ?? [];
+  let filtered: any[] = [];
+
+  if (parsedQuery.assetId) {
+    filtered = resources.filter((asset: any) =>
+      buildSearchableText(toSearchAsset(asset)).includes(parsedQuery.assetId as string),
+    );
+  } else if (isSemantic) {
+    filtered = resources
+      .map((asset: any) => {
+        const score = scoreAsset(toSearchAsset(asset), parsedQuery.terms);
+        return score > 0 ? { asset, score } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b as { score: number }).score - (a as { score: number }).score)
+      .map((item) => (item as { asset: any }).asset);
+  } else {
+    filtered = resources.filter((asset: any) =>
+      matchesQuery(toSearchAsset(asset), parsedQuery),
+    );
+  }
 
   const assets = filtered.slice(0, limit).map(mapAsset);
 
@@ -282,6 +321,7 @@ async function runSearch(request: NextRequest) {
     total: filtered.length,
     assets,
     next_cursor: result.next_cursor ?? null,
+    mode,
   });
 }
 

@@ -10,6 +10,8 @@ links.
 - Natural language search over tags, metadata, and filenames
 - Image previews and one-click downloads
 - Metadata-driven organization (photographer, usage rights, campaign, asset number)
+- Upload UI with metadata form (asset #, campaign, photographer, usage rights)
+- Optional AI auto-tagging and AI search mode
 - Optional folder scoping for multi-team libraries
 
 ## Quick Start
@@ -32,6 +34,7 @@ Create a `.env.local` file or configure these in Vercel:
 | `CLOUDINARY_API_KEY` | Cloudinary API key | Yes |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | Yes |
 | `CLOUDINARY_FOLDER` | Optional folder scope for assets | No |
+| `CLOUDINARY_AUTO_TAGGING_THRESHOLD` | Auto-tagging confidence (0.1-0.95) | No |
 
 ## How It Works
 
@@ -39,6 +42,7 @@ Create a `.env.local` file or configure these in Vercel:
 2. The API queries Cloudinary for the latest assets
 3. Results are filtered by the search query (tags, metadata, filenames, IDs)
 4. The UI renders previews and download links
+5. Uploads go through `POST /api/dam/upload` with metadata + optional AI tags
 
 ## Metadata Conventions
 
@@ -66,6 +70,9 @@ curl -X POST \
 - Search by image number: `image #1234`
 - Search by photographer: `photographer Alex`
 - Search by campaign name or tag: `spring launch`
+- Toggle **AI search** for broader semantic matches (uses tags + metadata)
+
+> Note: AI auto-tagging requires the Cloudinary Auto-Tagging add-on.
 
 ## Deployment
 
