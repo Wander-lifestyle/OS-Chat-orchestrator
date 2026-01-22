@@ -1,29 +1,16 @@
-# Editorial OS
+# Light DAM
 
-AI-first operating system for content and communications. One chat, all tools.
+Light DAM is a lightweight digital asset manager designed for small marketing teams
+who need a fast, searchable library of images (20-50 assets, not thousands). It uses
+Cloudinary as the single source of truth for storage, metadata, previews, and download
+links.
 
-## The Vision
+## Features
 
-```
-┌─────────────────────────────────────────────────┐
-│  ◈ Editorial OS                                 │
-├─────────────────────────────────────────────────┤
-│  [ Brief Engine ]  [ Campaign Deck ]  [ DAM ]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │ "Create a brief for EU eSIM launch..."   │  │
-│  └───────────────────────────────────────────┘  │
-│                                    [Send ✨]    │
-│                                                 │
-│  🤖 Editorial OS:                              │
-│  ✓ Brief created                               │
-│  ✓ Added to Campaign Deck (status: intake)     │
-│  ✓ Slack notified                              │
-│                                                 │
-│  [View Brief] [View in Deck] [Search DAM]      │
-└─────────────────────────────────────────────────┘
-```
+- Natural language search over tags, metadata, and filenames
+- Image previews and one-click downloads
+- Metadata-driven organization (photographer, usage rights, campaign, asset number)
+- Optional folder scoping for multi-team libraries
 
 ## Quick Start
 
@@ -31,164 +18,56 @@ AI-first operating system for content and communications. One chat, all tools.
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.example .env.local
-
-# Start development server
+# Start dev server
 npm run dev
 ```
 
 ## Environment Variables
 
-**Required**: Set these in Vercel or your `.env.local`:
+Create a `.env.local` file or configure these in Vercel:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
-| `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
-
-## Deploy to Vercel
-
-### Option 1: Via GitHub
-
-1. Push this repo to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/new)
-3. Set environment variables in Project Settings → Environment Variables
-4. Deploy
-
-### Option 2: Via CLI
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Preview deploy (staging)
-vercel
-
-# Production deploy
-vercel --prod
-```
-
-### Setting Environment Variables in Vercel
-
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
-   - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | Yes |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | Yes |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | Yes |
+| `CLOUDINARY_FOLDER` | Optional folder scope for assets | No |
 
 ## How It Works
 
-1. **You type** a natural language request
-2. **Router** determines which module handles it (Brief, Deck, DAM)
-3. **Executor** calls the appropriate API with timeout handling
-4. **Results** displayed with action buttons
+1. The UI calls `GET /api/dam/search?q=...`
+2. The API queries Cloudinary for the latest assets
+3. Results are filtered by the search query (tags, metadata, filenames, IDs)
+4. The UI renders previews and download links
 
-## Connected Modules
+## Metadata Conventions
 
-| Module | Purpose | URL |
-|--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
-| Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
+Light DAM reads metadata from either Cloudinary **context** or **structured metadata**.
+Populate any of these fields to power searching and UI labels:
 
-## Example Queries
+- `asset_id` (for image number searches)
+- `photographer`
+- `usage_rights`
+- `campaign`
+- `description` / `caption`
 
-**Creating briefs:**
-- "Create a brief for EU eSIM launch"
-- "New campaign for Q1 brand awareness targeting millennials"
-- "Make a brief called Holiday Sale for email and Instagram"
+### Example: Uploading with Context
 
-**Checking campaigns:**
-- "Show me active campaigns"
-- "What's the status of the EU launch?"
-- "List all projects"
-
-**Finding assets:**
-- "Find hero images for Instagram"
-- "Search for travel photos"
-- "I need visuals for the EU campaign"
-
-## Architecture
-
-```
-User Query
-    ↓
-Editorial OS (API Route)
-    ↓
-Router (with 5s timeout)
-    ↓
-┌───────────┬───────────┬───────────┐
-│  Brief    │  Campaign │   Light   │
-│  Engine   │   Deck    │    DAM    │
-└───────────┴───────────┴───────────┘
-    ↓
-Results + Actions
+```bash
+curl -X POST \
+  -F file=@hero.jpg \
+  -F upload_preset=your_preset \
+  -F context="asset_id=1234|photographer=Alex Rivera|usage_rights=Global paid social|campaign=Spring Launch" \
+  "https://api.cloudinary.com/v1_1/<cloud-name>/image/upload"
 ```
 
-## The Flow
+## Search Tips
 
-```
-"Create a brief for EU eSIM launch"
-    ↓
-API Route: POST /api/chat
-    ↓
-Router: module=brief, intent=create
-    ↓
-POST brief-engine.vercel.app/api/brief/create (5s timeout)
-    ↓
-Brief Engine: Creates brief + POSTs to Campaign Deck
-    ↓
-Campaign Deck: Creates ledger entry (intake)
-    ↓
-Editorial OS: "✓ Brief created. ✓ Added to Deck."
-    ↓
-Action buttons: [View Brief] [View in Deck]
-```
+- Search by image number: `image #1234`
+- Search by photographer: `photographer Alex`
+- Search by campaign name or tag: `spring launch`
 
-## Project Structure
+## Deployment
 
-```
-editorial-os/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # API endpoint for chat
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main chat interface
-├── components/
-│   ├── ChatInput.tsx         # Message input component
-│   ├── ChatMessage.tsx       # Message display component
-│   ├── ErrorBoundary.tsx     # Error handling wrapper
-│   └── ModuleTabs.tsx        # Module navigation tabs
-├── lib/
-│   ├── router.ts             # Query routing logic
-│   └── types.ts              # TypeScript types
-├── .env.example              # Environment variables template
-├── .gitignore
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-└── tsconfig.json
-```
-
-## This is the Product
-
-Not individual tools. One unified interface.
-
-- **Solopreneur**: "Create a brief for my launch" → Done
-- **Marketing team**: "Show active campaigns" → Dashboard
-- **Agency**: "Find assets for client X" → Results
-
-All from one chat box.
-
----
-
-Part of Editorial OS. Built for content operations at any scale.
+Deploy to Vercel as a standard Next.js app. Add the Cloudinary environment variables
+in Project Settings.
