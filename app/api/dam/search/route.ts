@@ -334,6 +334,7 @@ async function runSearch(request: NextRequest) {
     .sort_by('created_at', 'desc')
     .with_field('context')
     .with_field('metadata')
+    .with_field('tags')
     .max_results(MAX_FETCH);
 
   if (cursor) {
