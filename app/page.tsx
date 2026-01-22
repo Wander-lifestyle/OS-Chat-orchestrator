@@ -33,19 +33,24 @@ type DamSearchResponse = {
   missing?: string[];
 };
 
-type UploadResponse = {
-  success?: boolean;
+type UploadSignatureResponse = {
+  signature?: string;
+  timestamp?: number;
+  cloudName?: string;
+  apiKey?: string;
+  folder?: string | null;
+  context?: string | null;
+  tags?: string | null;
+  auto_tagging?: number | null;
   error?: string;
   missing?: string[];
-  uploaded?: number;
-  failed?: number;
-  warnings?: string[];
-  errors?: Array<{ fileName: string; error: string }>;
-  assets?: Array<{
-    public_id: string;
-    tags?: string[];
-    ai_tag_confidence?: Record<string, number>;
-  }>;
+};
+
+type CloudinaryUploadResult = {
+  public_id?: string;
+  secure_url?: string;
+  tags?: string[] | string;
+  error?: { message?: string };
 };
 
 const EMPTY_RESULTS: DamSearchResponse = {
@@ -84,6 +89,17 @@ function getField(asset: DamAsset, keys: string[]) {
     if (asset.context[key]) return asset.context[key];
   }
   return undefined;
+}
+
+function normalizeTags(value: CloudinaryUploadResult['tags']) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((tag) => String(tag).trim()).filter(Boolean);
+  }
+  return value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 export default function LightDamPage() {
@@ -234,44 +250,82 @@ export default function LightDamPage() {
     setUploadWarnings([]);
 
     try {
-      const formData = new FormData();
-      uploadFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-      formData.append('assetNumber', uploadFields.assetNumber);
-      formData.append('photographer', uploadFields.photographer);
-      formData.append('usageRights', uploadFields.usageRights);
-      formData.append('campaign', uploadFields.campaign);
-      formData.append('description', uploadFields.description);
-      formData.append('tags', uploadFields.tags);
-      formData.append('enableAutoTagging', String(enableAutoTagging));
-
-      const response = await fetch('/api/dam/upload', {
+      const signatureResponse = await fetch('/api/dam/upload/signature', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetNumber: uploadFiles.length > 1 ? '' : uploadFields.assetNumber,
+          photographer: uploadFields.photographer,
+          usageRights: uploadFields.usageRights,
+          campaign: uploadFields.campaign,
+          description: uploadFields.description,
+          tags: uploadFields.tags,
+          enableAutoTagging,
+        }),
       });
-      const data = (await response.json()) as UploadResponse;
-      if (!response.ok) {
+
+      const signatureData = (await signatureResponse.json()) as UploadSignatureResponse;
+      if (!signatureResponse.ok || !signatureData.signature) {
         setUploadStatus('error');
-        setUploadMessage(data.error || 'Upload failed.');
-        setUploadErrors(data.errors ?? []);
+        setUploadMessage(signatureData.error || 'Unable to prepare upload.');
         return;
       }
 
-      const uploaded = data.uploaded ?? data.assets?.length ?? 0;
-      const failed = data.failed ?? 0;
+      if (!signatureData.cloudName || !signatureData.apiKey || !signatureData.timestamp) {
+        setUploadStatus('error');
+        setUploadMessage('Upload configuration is incomplete.');
+        return;
+      }
+
+      const uploadEndpoint = `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`;
+      const uploadedAssets: CloudinaryUploadResult[] = [];
+      const errors: Array<{ fileName: string; error: string }> = [];
+
+      for (const file of uploadFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('api_key', signatureData.apiKey);
+        formData.append('timestamp', String(signatureData.timestamp));
+        formData.append('signature', signatureData.signature);
+        if (signatureData.folder) formData.append('folder', signatureData.folder);
+        if (signatureData.context) formData.append('context', signatureData.context);
+        if (signatureData.tags) formData.append('tags', signatureData.tags);
+        if (signatureData.auto_tagging) {
+          formData.append('auto_tagging', String(signatureData.auto_tagging));
+        }
+
+        const uploadResponse = await fetch(uploadEndpoint, {
+          method: 'POST',
+          body: formData,
+        });
+        const uploadData = (await uploadResponse.json()) as CloudinaryUploadResult;
+        if (!uploadResponse.ok || uploadData.error) {
+          errors.push({
+            fileName: file.name,
+            error: uploadData.error?.message || 'Upload failed.',
+          });
+          continue;
+        }
+        uploadedAssets.push(uploadData);
+      }
+
+      const uploaded = uploadedAssets.length;
+      const failed = errors.length;
       if (uploaded > 0) {
         setUploadStatus('success');
         setUploadMessage(`Uploaded ${uploaded} asset${uploaded === 1 ? '' : 's'}.${failed ? ` ${failed} failed.` : ''}`);
       } else {
         setUploadStatus('error');
-        setUploadMessage(data.error || 'Upload failed.');
+        setUploadMessage(errors[0]?.error || 'Upload failed. Please check file size and try again.');
       }
-      const tagList = data.assets?.flatMap((asset) => asset.tags ?? []) ?? [];
+
+      const tagList = uploadedAssets.flatMap((asset) => normalizeTags(asset.tags));
       const uniqueTags = Array.from(new Set(tagList)).slice(0, 12);
       setUploadTags(uniqueTags);
-      setUploadErrors(data.errors ?? []);
-      setUploadWarnings(data.warnings ?? []);
+      setUploadErrors(errors);
+      if (uploadFiles.length > 1) {
+        setUploadWarnings(['Asset number is ignored for multi-file uploads.']);
+      }
       setUploadFiles([]);
       setUploadFields((prev) => ({
         ...prev,

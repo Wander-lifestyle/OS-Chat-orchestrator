@@ -44,7 +44,7 @@ Create a `.env.local` file or configure these in Vercel:
 2. The API queries Cloudinary for the latest assets
 3. Results are filtered by the search query (tags, metadata, filenames, IDs)
 4. The UI renders previews and download links
-5. Uploads go through `POST /api/dam/upload` with metadata + optional AI tags
+5. Uploads go directly to Cloudinary using a signed upload signature (supports larger files).
 
 ## Metadata Conventions
 
