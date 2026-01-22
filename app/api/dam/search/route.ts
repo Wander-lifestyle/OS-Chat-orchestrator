@@ -290,9 +290,15 @@ async function runSearch(request: NextRequest) {
     payload?.mode ?? (request.nextUrl.searchParams.get('mode') as SearchMode | null);
   const mode: SearchMode = modeParam === 'semantic' ? 'semantic' : 'strict';
   const isSemantic = mode === 'semantic';
-  const requestedLimit = Number(payload?.limit ?? request.nextUrl.searchParams.get('limit'));
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.min(Math.max(requestedLimit, 1), MAX_LIMIT)
+  const limitParam = payload?.limit ?? request.nextUrl.searchParams.get('limit');
+  const requestedLimit =
+    typeof limitParam === 'number'
+      ? limitParam
+      : limitParam
+        ? Number(limitParam)
+        : undefined;
+  const limit = Number.isFinite(requestedLimit ?? Number.NaN)
+    ? Math.min(Math.max(requestedLimit as number, 1), MAX_LIMIT)
     : DEFAULT_LIMIT;
 
   const missing = getMissingEnv();
