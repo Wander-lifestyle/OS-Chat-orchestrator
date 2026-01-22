@@ -123,7 +123,11 @@ async function updateAiTagContext(publicId: string, baseContext: string, tagConf
   const mergedContext = baseContext
     ? `${baseContext}|ai_tag_confidence=${aiValue}`
     : `ai_tag_confidence=${aiValue}`;
-  await cloudinary.uploader.update(publicId, { context: mergedContext });
+  await cloudinary.uploader.explicit(publicId, {
+    type: 'upload',
+    resource_type: 'image',
+    context: mergedContext,
+  });
 }
 
 export async function POST(request: NextRequest) {
