@@ -350,14 +350,14 @@ async function runSearch(request: NextRequest) {
       buildSearchableText(toSearchAsset(asset)).includes(parsedQuery.assetId as string),
     );
   } else if (isSemantic) {
-    filtered = resources
+    const scored = resources
       .map((asset: any) => {
         const score = scoreAsset(toSearchAsset(asset), parsedQuery.terms);
         return score > 0 ? { asset, score } : null;
       })
-      .filter(Boolean)
-      .sort((a, b) => (b as { score: number }).score - (a as { score: number }).score)
-      .map((item) => (item as { asset: any }).asset);
+      .filter((item): item is { asset: any; score: number } => item !== null);
+    scored.sort((a, b) => b.score - a.score);
+    filtered = scored.map((item) => item.asset);
   } else {
     filtered = resources.filter((asset: any) =>
       matchesQuery(toSearchAsset(asset), parsedQuery),
