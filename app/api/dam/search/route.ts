@@ -357,7 +357,7 @@ async function runSearch(request: NextRequest) {
       })
       .filter((item: { asset: any; score: number } | null): item is { asset: any; score: number } => item !== null);
     scored.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
-    filtered = scored.map((item) => item.asset);
+    filtered = scored.map((item: { asset: any; score: number }) => item.asset);
   } else {
     filtered = resources.filter((asset: any) =>
       matchesQuery(toSearchAsset(asset), parsedQuery),
