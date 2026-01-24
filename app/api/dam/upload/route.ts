@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { auth } from '@clerk/nextjs/server';
 
 const REQUIRED_ENV = [
   'CLOUDINARY_CLOUD_NAME',
@@ -132,6 +133,11 @@ async function updateAiTagContext(publicId: string, baseContext: string, tagConf
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const configResult = configureCloudinary();
     if (!configResult.ok) {
       return NextResponse.json(

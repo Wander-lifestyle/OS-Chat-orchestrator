@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, DragEvent, FormEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { OrganizationSwitcher, UserButton, useOrganization } from '@clerk/nextjs';
 
 type DamAsset = {
   id: string;
@@ -103,6 +104,7 @@ function normalizeTags(value: CloudinaryUploadResult['tags']) {
 }
 
 export default function LightDamPage() {
+  const { organization, isLoaded: organizationLoaded } = useOrganization();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DamSearchResponse>(EMPTY_RESULTS);
   const [isLoading, setIsLoading] = useState(false);
@@ -384,13 +386,34 @@ export default function LightDamPage() {
                   Quick, human-friendly search over your Cloudinary-backed assets.
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-os-muted">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-os-muted">
                 <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1 shadow-sm">
                   <span className={`h-2 w-2 rounded-full ${connectionBadge.color}`} />
                   {connectionBadge.label}
                 </span>
+                <OrganizationSwitcher
+                  hidePersonal
+                  appearance={{
+                    elements: {
+                      organizationSwitcherTrigger:
+                        'rounded-full border border-black/10 bg-white px-3 py-1 text-xs shadow-sm',
+                    },
+                  }}
+                />
+                <UserButton
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: 'h-8 w-8',
+                    },
+                  }}
+                />
               </div>
             </div>
+            {organizationLoaded && !organization && (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+                Create a workspace to save assets and invite teammates.
+              </div>
+            )}
             <form
               onSubmit={handleSubmit}
               className="mt-6 flex flex-col gap-3 rounded-2xl border border-black/10 bg-white/80 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center"

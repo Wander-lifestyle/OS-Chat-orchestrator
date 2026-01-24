@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { auth } from '@clerk/nextjs/server';
 
 type SearchMode = 'strict' | 'semantic';
 
@@ -281,6 +282,11 @@ function normalizeConfidence(score: number) {
 }
 
 async function runSearch(request: NextRequest) {
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
   const isPost = request.method === 'POST';
   const payload = isPost ? ((await request.json()) as DamSearchRequest) : null;
   const query = payload?.query ?? request.nextUrl.searchParams.get('q') ?? '';

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { auth } from '@clerk/nextjs/server';
 
 type SignatureRequest = {
   assetNumber?: string;
@@ -71,6 +72,11 @@ function getAutoTaggingThreshold() {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const configResult = configureCloudinary();
     if (!configResult.ok) {
       return NextResponse.json(

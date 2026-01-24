@@ -37,6 +37,22 @@ Create a `.env.local` file or configure these in Vercel:
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | Yes |
 | `CLOUDINARY_FOLDER` | Optional folder scope for assets | No |
 | `CLOUDINARY_AUTO_TAGGING_THRESHOLD` | Auto-tagging confidence (0.1-0.95) | No |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key | Yes (Milestone 1) |
+| `CLERK_SECRET_KEY` | Clerk secret key | Yes (Milestone 1) |
+| `NEXT_PUBLIC_GA_ID` | Google Analytics measurement ID | No |
+
+## Authentication (Milestone 1)
+
+Light DAM uses Clerk for authentication and organizations. Create a Clerk app, then set:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+
+Marketing page stays public at `/marketing`.
 
 ## How It Works
 
