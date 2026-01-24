@@ -61,6 +61,14 @@ type UsageSummary = {
   error?: string;
 };
 
+type BillingSummary = {
+  active: boolean;
+  status: string;
+  currentPeriodEnd: string | null;
+  trialEnd: string | null;
+  error?: string;
+};
+
 const EMPTY_RESULTS: DamSearchResponse = {
   query: '',
   total: 0,
@@ -137,6 +145,8 @@ export default function LightDamPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [usageStatus, setUsageStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const [billingStatus, setBillingStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const fetchAssets = useCallback(async (
     searchQuery: string,
@@ -200,6 +210,33 @@ export default function LightDamPage() {
   useEffect(() => {
     void fetchUsage();
   }, [fetchUsage]);
+
+  const fetchBilling = useCallback(async () => {
+    if (!organizationLoaded || !organization) {
+      setBilling(null);
+      return;
+    }
+    setBillingStatus('loading');
+    try {
+      const response = await fetch('/api/billing/status');
+      const data = (await response.json()) as BillingSummary;
+      if (!response.ok) {
+        setBillingStatus('error');
+        setBilling(null);
+        return;
+      }
+      setBilling(data);
+      setBillingStatus('idle');
+    } catch (err) {
+      console.error('Billing status fetch failed:', err);
+      setBilling(null);
+      setBillingStatus('error');
+    }
+  }, [organization, organizationLoaded]);
+
+  useEffect(() => {
+    void fetchBilling();
+  }, [fetchBilling]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -355,6 +392,7 @@ export default function LightDamPage() {
         setUploadStatus('success');
         setUploadMessage(`Uploaded ${uploaded} asset${uploaded === 1 ? '' : 's'}.${failed ? ` ${failed} failed.` : ''}`);
         void fetchUsage();
+        void fetchBilling();
       } else {
         setUploadStatus('error');
         setUploadMessage(errors[0]?.error || 'Upload failed. Please check file size and try again.');
@@ -391,6 +429,7 @@ export default function LightDamPage() {
     uploadFiles,
     uploadStatus,
     fetchUsage,
+    fetchBilling,
   ]);
 
   const summary = useMemo(() => {
@@ -413,6 +452,8 @@ export default function LightDamPage() {
   }, [error]);
 
   const limitReached = usage ? usage.used >= usage.limit : false;
+  const billingActive = billing?.active ?? false;
+  const billingReady = billingStatus !== 'loading';
 
   const errorTitle = useMemo(() => {
     if (!error) return '';
@@ -465,6 +506,12 @@ export default function LightDamPage() {
                   className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
                 >
                   Activity log
+                </a>
+                <a
+                  href="/billing"
+                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
+                >
+                  Billing
                 </a>
                 <UserButton
                   appearance={{
@@ -571,9 +618,23 @@ export default function LightDamPage() {
                   Unable to load usage. Check your Cloudinary connection.
                 </p>
               )}
+              {billingStatus === 'error' && (
+                <p className="mt-2 text-xs text-red-600">
+                  Unable to load billing status.
+                </p>
+              )}
             </div>
             <span className="text-xs text-os-muted">AI tagging is optional.</span>
           </div>
+          {!billingActive && (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+              Billing is required to upload assets. Start your trial on the{' '}
+              <a href="/billing" className="font-semibold underline">
+                billing page
+              </a>
+              .
+            </div>
+          )}
 
           <form onSubmit={handleUploadSubmit} className="mt-6 grid gap-5">
             <label
@@ -718,7 +779,13 @@ export default function LightDamPage() {
               </label>
               <button
                 type="submit"
-                disabled={uploadStatus === 'uploading' || uploadFiles.length === 0 || limitReached}
+                disabled={
+                  uploadStatus === 'uploading' ||
+                  uploadFiles.length === 0 ||
+                  limitReached ||
+                  !billingActive ||
+                  !billingReady
+                }
                 className="h-11 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-black/20"
               >
                 {uploadStatus === 'uploading'

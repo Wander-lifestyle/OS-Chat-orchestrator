@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { configureCloudinary, getAssetCount, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 import { getAssetLimit } from '@/lib/limits';
 import { logAuditEvent } from '@/lib/audit';
+import { getBillingForOrg, isBillingActive } from '@/lib/billing';
 
 type SignatureRequest = {
   assetNumber?: string;
@@ -72,6 +73,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Cloudinary is not connected for this workspace.' },
         { status: 400 },
+      );
+    }
+
+    const billing = await getBillingForOrg(orgId);
+    if (!isBillingActive(billing)) {
+      return NextResponse.json(
+        { error: 'Active subscription required.' },
+        { status: 402 },
       );
     }
 

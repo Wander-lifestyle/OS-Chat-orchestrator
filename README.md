@@ -44,6 +44,14 @@ Create a `.env.local` file or configure these in Vercel:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes (Milestone 2) |
 | `SUPABASE_ANON_KEY` | Supabase publishable key | No |
 | `LIGHT_DAM_ASSET_LIMIT` | Max assets per workspace | No (default: 50) |
+| `STRIPE_SECRET_KEY` | Stripe secret key | Yes (Milestone 5) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Yes (Milestone 5) |
+| `STRIPE_PRICE_MONTHLY_ID` | Stripe monthly price ID | Yes (Milestone 5) |
+| `STRIPE_PRICE_YEARLY_ID` | Stripe yearly price ID | Optional |
+| `STRIPE_COUPON_YEARLY_ID` | Stripe coupon for yearly discount | Optional |
+| `STRIPE_TRIAL_DAYS` | Trial length in days | Optional (default 7) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | Yes (Milestone 5) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL | Optional |
 
 ## Authentication (Milestone 1)
 
@@ -91,6 +99,22 @@ create index if not exists audit_logs_created_at_idx on audit_logs (created_at d
 ```
 
 > Note: credentials are stored in Supabase and accessed via the service role key.
+
+Create an `organization_billing` table for Stripe:
+
+```sql
+create table if not exists organization_billing (
+  org_id text primary key,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  status text,
+  price_id text,
+  current_period_end timestamptz,
+  trial_end timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
 
 ## Usage limits (Milestone 3)
 
