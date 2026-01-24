@@ -5,6 +5,7 @@ import { promisify } from 'util';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// Bridge endpoint: validate input, run Claude CLI, return output.
 const execFileAsync = promisify(execFile);
 const TIMEOUT_MS = 60_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
