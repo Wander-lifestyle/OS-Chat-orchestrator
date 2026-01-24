@@ -72,9 +72,12 @@ function getAutoTaggingThreshold() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId, orgId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    }
+    if (!orgId) {
+      return NextResponse.json({ error: 'Workspace required.' }, { status: 403 });
     }
 
     const configResult = configureCloudinary();

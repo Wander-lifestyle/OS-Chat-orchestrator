@@ -400,6 +400,12 @@ export default function LightDamPage() {
                     },
                   }}
                 />
+                <a
+                  href="/organization"
+                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
+                >
+                  Manage workspace
+                </a>
                 <UserButton
                   appearance={{
                     elements: {
@@ -411,7 +417,10 @@ export default function LightDamPage() {
             </div>
             {organizationLoaded && !organization && (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                Create a workspace to save assets and invite teammates.
+                Create a workspace to save assets and invite teammates.{' '}
+                <a href="/onboarding" className="font-semibold underline">
+                  Create workspace
+                </a>
               </div>
             )}
             <form
