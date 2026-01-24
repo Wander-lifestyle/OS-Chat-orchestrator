@@ -1,0 +1,60 @@
+%PDF-1.4
+%Checklist
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 756 >>
+stream
+BT
+/F1 14 Tf
+72 760 Td
+(Editorial OS Launch Checklist) Tj
+0 -22 Td
+/F1 11 Tf
+(1. Create Vercel project for OS-Chat-orchestrator.) Tj
+0 -14 Td
+(- Root Directory: editorial-os) Tj
+0 -14 Td
+(- Production Branch: cursor/background-task-identifier-aba1) Tj
+0 -14 Td
+(2. Add environment variables in Vercel.) Tj
+0 -14 Td
+(- Required: ANTHROPIC_API_KEY, NOTION_API_KEY, NOTION_LEDGER_DATABASE_ID.) Tj
+0 -14 Td
+(3. Create Notion databases: Ledger, Clients, Briefs.) Tj
+0 -14 Td
+(4. Share each DB with the Notion integration.) Tj
+0 -14 Td
+(5. Add a Client row with Client ID + Beehiiv keys.) Tj
+0 -14 Td
+(6. Redeploy in Vercel.) Tj
+0 -14 Td
+(7. Open UI, enter Client ID, run newsletter prompt.) Tj
+0 -14 Td
+(8. Confirm ledger updates and Beehiiv scheduling.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000020 00000 n 
+0000000069 00000 n 
+0000000126 00000 n 
+0000000252 00000 n 
+0000000322 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+0000001128
+%%EOF
