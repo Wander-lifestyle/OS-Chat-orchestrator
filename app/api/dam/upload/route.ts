@@ -3,6 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
 import { configureCloudinary, getAssetCount, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 import { getAssetLimit } from '@/lib/limits';
+import { logAuditEvent } from '@/lib/audit';
 
 const DEFAULT_AUTO_TAGGING_THRESHOLD = 0.6;
 
@@ -256,6 +257,23 @@ export async function POST(request: NextRequest) {
           fileName: file.name,
           error: typeof fileError?.message === 'string' ? fileError.message : 'Upload failed.',
         });
+      }
+    }
+
+    if (assets.length > 0) {
+      try {
+        await logAuditEvent({
+          orgId,
+          userId,
+          action: 'upload',
+          details: {
+            uploaded: assets.length,
+            failed: errors.length,
+            files: assets.map((asset) => asset.public_id),
+          },
+        });
+      } catch (error) {
+        console.error('Audit log error:', error);
       }
     }
 

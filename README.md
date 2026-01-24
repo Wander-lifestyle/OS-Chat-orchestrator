@@ -74,11 +74,32 @@ create table if not exists organization_cloudinary (
 );
 ```
 
+Create an `audit_logs` table for activity tracking:
+
+```sql
+create table if not exists audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  org_id text not null,
+  user_id text not null,
+  action text not null,
+  details jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists audit_logs_org_id_idx on audit_logs (org_id);
+create index if not exists audit_logs_created_at_idx on audit_logs (created_at desc);
+```
+
 > Note: credentials are stored in Supabase and accessed via the service role key.
 
 ## Usage limits (Milestone 3)
 
 Set `LIGHT_DAM_ASSET_LIMIT` to cap total assets per workspace. Defaults to 50.
+
+## Audit logs (Milestone 4)
+
+Activity is recorded for search, uploads, downloads, and settings updates.
+Visit `/audit` to view the latest events.
 
 ## How It Works
 

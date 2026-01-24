@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
 import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { logAuditEvent } from '@/lib/audit';
 
 type SearchMode = 'strict' | 'semantic';
 
@@ -153,12 +154,7 @@ function buildPreviewUrl(publicId: string) {
 }
 
 function buildDownloadUrl(publicId: string) {
-  return cloudinary.url(publicId, {
-    secure: true,
-    resource_type: 'image',
-    type: 'upload',
-    flags: 'attachment',
-  });
+  return `/api/dam/download?public_id=${encodeURIComponent(publicId)}`;
 }
 
 function mapAsset(asset: any): DamAsset {
@@ -351,6 +347,24 @@ async function runSearch(request: NextRequest) {
   }
 
   const assets = filtered.slice(0, limit).map(mapAsset);
+
+  if (query.trim().length > 0) {
+    try {
+      await logAuditEvent({
+        orgId,
+        userId,
+        action: 'search',
+        details: {
+          query,
+          mode,
+          total: filtered.length,
+          returned: assets.length,
+        },
+      });
+    } catch (error) {
+      console.error('Audit log error:', error);
+    }
+  }
 
   return NextResponse.json({
     query,

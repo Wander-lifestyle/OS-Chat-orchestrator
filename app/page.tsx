@@ -460,6 +460,12 @@ export default function LightDamPage() {
                 >
                   Cloudinary settings
                 </a>
+                <a
+                  href="/audit"
+                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
+                >
+                  Activity log
+                </a>
                 <UserButton
                   appearance={{
                     elements: {

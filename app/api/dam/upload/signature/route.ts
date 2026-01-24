@@ -3,6 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
 import { configureCloudinary, getAssetCount, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 import { getAssetLimit } from '@/lib/limits';
+import { logAuditEvent } from '@/lib/audit';
 
 type SignatureRequest = {
   assetNumber?: string;
@@ -117,6 +118,22 @@ export async function POST(request: NextRequest) {
     }
 
     const signature = cloudinary.utils.api_sign_request(params, settings.apiSecret);
+
+    try {
+      await logAuditEvent({
+        orgId,
+        userId,
+        action: 'upload_requested',
+        details: {
+          fileCount,
+          assetNumber,
+          campaign,
+          tags: tagsValue ? tagsValue.split(',').map((tag) => tag.trim()) : [],
+        },
+      });
+    } catch (error) {
+      console.error('Audit log error:', error);
+    }
 
     return NextResponse.json({
       signature,

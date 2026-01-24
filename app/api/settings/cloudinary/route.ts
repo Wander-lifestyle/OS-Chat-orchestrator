@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { logAuditEvent } from '@/lib/audit';
 
 type CloudinarySettingsPayload = {
   cloudName?: string;
@@ -91,6 +92,17 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error('Cloudinary settings update error:', error);
     return NextResponse.json({ error: 'Failed to save settings.' }, { status: 500 });
+  }
+
+  try {
+    await logAuditEvent({
+      orgId,
+      userId,
+      action: 'settings_updated',
+      details: { provider: 'cloudinary', folder },
+    });
+  } catch (auditError) {
+    console.error('Audit log error:', auditError);
   }
 
   return NextResponse.json({ success: true });
