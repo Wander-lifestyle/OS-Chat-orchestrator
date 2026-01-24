@@ -16,15 +16,19 @@ export type AuditEvent = {
 
 export async function logAuditEvent(event: AuditEvent) {
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from('audit_logs').insert([
-    {
-      org_id: event.orgId,
-      user_id: event.userId,
-      action: event.action,
-      details: event.details ?? {},
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const { error } = await supabase
+    .from('audit_logs')
+    .insert(
+      [
+        {
+          org_id: event.orgId,
+          user_id: event.userId,
+          action: event.action,
+          details: event.details ?? {},
+          created_at: new Date().toISOString(),
+        },
+      ] as any,
+    );
 
   if (error) {
     throw error;
