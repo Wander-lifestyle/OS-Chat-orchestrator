@@ -54,6 +54,13 @@ type CloudinaryUploadResult = {
   error?: { message?: string };
 };
 
+type UsageSummary = {
+  limit: number;
+  used: number;
+  remaining: number;
+  error?: string;
+};
+
 const EMPTY_RESULTS: DamSearchResponse = {
   query: '',
   total: 0,
@@ -128,6 +135,8 @@ export default function LightDamPage() {
   });
   const [enableAutoTagging, setEnableAutoTagging] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [usageStatus, setUsageStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const fetchAssets = useCallback(async (
     searchQuery: string,
@@ -164,6 +173,33 @@ export default function LightDamPage() {
       setUploadFields((prev) => ({ ...prev, assetNumber: '' }));
     }
   }, [uploadFiles.length, uploadFields.assetNumber]);
+
+  const fetchUsage = useCallback(async () => {
+    if (!organizationLoaded || !organization) {
+      setUsage(null);
+      return;
+    }
+    setUsageStatus('loading');
+    try {
+      const response = await fetch('/api/usage');
+      const data = (await response.json()) as UsageSummary;
+      if (!response.ok) {
+        setUsageStatus('error');
+        setUsage(null);
+        return;
+      }
+      setUsage(data);
+      setUsageStatus('idle');
+    } catch (err) {
+      console.error('Usage fetch failed:', err);
+      setUsage(null);
+      setUsageStatus('error');
+    }
+  }, [organization, organizationLoaded]);
+
+  useEffect(() => {
+    void fetchUsage();
+  }, [fetchUsage]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -264,6 +300,7 @@ export default function LightDamPage() {
           description: uploadFields.description,
           tags: uploadFields.tags,
           enableAutoTagging,
+          fileCount: uploadFiles.length,
         }),
       });
 
@@ -317,6 +354,7 @@ export default function LightDamPage() {
       if (uploaded > 0) {
         setUploadStatus('success');
         setUploadMessage(`Uploaded ${uploaded} asset${uploaded === 1 ? '' : 's'}.${failed ? ` ${failed} failed.` : ''}`);
+        void fetchUsage();
       } else {
         setUploadStatus('error');
         setUploadMessage(errors[0]?.error || 'Upload failed. Please check file size and try again.');
@@ -352,6 +390,7 @@ export default function LightDamPage() {
     uploadFields,
     uploadFiles,
     uploadStatus,
+    fetchUsage,
   ]);
 
   const summary = useMemo(() => {
@@ -372,6 +411,8 @@ export default function LightDamPage() {
     }
     return { label: 'Cloudinary connected', color: 'bg-os-success' };
   }, [error]);
+
+  const limitReached = usage ? usage.used >= usage.limit : false;
 
   const errorTitle = useMemo(() => {
     if (!error) return '';
@@ -514,6 +555,16 @@ export default function LightDamPage() {
               <p className="text-sm text-os-muted">
                 Add metadata so your team can search by campaign, usage rights, or photographer.
               </p>
+              {usage && (
+                <p className="mt-2 text-xs text-os-muted">
+                  Usage: {usage.used} of {usage.limit} assets.
+                </p>
+              )}
+              {usageStatus === 'error' && (
+                <p className="mt-2 text-xs text-red-600">
+                  Unable to load usage. Check your Cloudinary connection.
+                </p>
+              )}
             </div>
             <span className="text-xs text-os-muted">AI tagging is optional.</span>
           </div>
@@ -661,7 +712,7 @@ export default function LightDamPage() {
               </label>
               <button
                 type="submit"
-                disabled={uploadStatus === 'uploading' || uploadFiles.length === 0}
+                disabled={uploadStatus === 'uploading' || uploadFiles.length === 0 || limitReached}
                 className="h-11 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-black/20"
               >
                 {uploadStatus === 'uploading'
@@ -669,6 +720,11 @@ export default function LightDamPage() {
                   : `Upload ${uploadFiles.length > 1 ? `${uploadFiles.length} assets` : 'asset'}`}
               </button>
             </div>
+            {limitReached && (
+              <div className="text-xs text-red-600">
+                Asset limit reached. Remove assets or upgrade your plan.
+              </div>
+            )}
 
             {uploadStatus !== 'idle' && uploadMessage && (
               <div

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
-import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { configureCloudinary, getAssetCount, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { getAssetLimit } from '@/lib/limits';
 
 type SignatureRequest = {
   assetNumber?: string;
@@ -11,6 +12,7 @@ type SignatureRequest = {
   description?: string;
   tags?: string;
   enableAutoTagging?: boolean;
+  fileCount?: number;
 };
 
 const DEFAULT_AUTO_TAGGING_THRESHOLD = 0.6;
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
     configureCloudinary(settings);
 
     const payload = (await request.json()) as SignatureRequest;
+    const fileCount = Math.max(Number(payload.fileCount ?? 1), 1);
     const assetNumber = payload.assetNumber?.trim() ?? '';
     const photographer = payload.photographer?.trim() ?? '';
     const usageRights = payload.usageRights?.trim() ?? '';
@@ -93,6 +96,15 @@ export async function POST(request: NextRequest) {
 
     const folder = settings.folder?.trim();
     const timestamp = Math.floor(Date.now() / 1000);
+
+    const limit = getAssetLimit();
+    const used = await getAssetCount(settings, Math.min(limit + fileCount, 500));
+    if (used + fileCount > limit) {
+      return NextResponse.json(
+        { error: `Asset limit reached (${used}/${limit}).` },
+        { status: 403 },
+      );
+    }
 
     const params: Record<string, string | number> = {
       timestamp,

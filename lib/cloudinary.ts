@@ -48,3 +48,30 @@ export function configureCloudinary(settings: CloudinarySettings) {
     secure: true,
   });
 }
+
+function escapeExpressionValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const escaped = trimmed.replace(/"/g, '\\"');
+  return /\s/.test(escaped) ? `"${escaped}"` : escaped;
+}
+
+export function buildAssetExpression(folder?: string | null) {
+  const trimmedFolder = folder?.trim();
+  const folderExpression = trimmedFolder ? ` AND folder:${escapeExpressionValue(trimmedFolder)}` : '';
+  return `resource_type:image AND type:upload${folderExpression}`;
+}
+
+export async function getAssetCount(settings: CloudinarySettings, maxResults: number) {
+  configureCloudinary(settings);
+  const expression = buildAssetExpression(settings.folder);
+  const searchQuery = cloudinary.search
+    .expression(expression)
+    .sort_by('created_at', 'desc')
+    .max_results(maxResults);
+  const result = await searchQuery.execute();
+  if (typeof result.total_count === 'number') {
+    return result.total_count;
+  }
+  return Array.isArray(result.resources) ? result.resources.length : 0;
+}

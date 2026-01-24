@@ -42,6 +42,8 @@ Create a `.env.local` file or configure these in Vercel:
 | `NEXT_PUBLIC_GA_ID` | Google Analytics measurement ID | No |
 | `SUPABASE_URL` | Supabase project URL | Yes (Milestone 2) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes (Milestone 2) |
+| `SUPABASE_ANON_KEY` | Supabase publishable key | No |
+| `LIGHT_DAM_ASSET_LIMIT` | Max assets per workspace | No (default: 50) |
 
 ## Authentication (Milestone 1)
 
@@ -73,6 +75,10 @@ create table if not exists organization_cloudinary (
 ```
 
 > Note: credentials are stored in Supabase and accessed via the service role key.
+
+## Usage limits (Milestone 3)
+
+Set `LIGHT_DAM_ASSET_LIMIT` to cap total assets per workspace. Defaults to 50.
 
 ## How It Works
 

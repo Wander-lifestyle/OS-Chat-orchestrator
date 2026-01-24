@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
-import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { configureCloudinary, getAssetCount, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { getAssetLimit } from '@/lib/limits';
 
 const DEFAULT_AUTO_TAGGING_THRESHOLD = 0.6;
 
@@ -130,6 +131,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Cloudinary is not connected for this workspace.' },
         { status: 400 },
+      );
+    }
+
+    const limit = getAssetLimit();
+    const incomingCount = fileList.length;
+    const used = await getAssetCount(settings, Math.min(limit + incomingCount, 500));
+    if (used + incomingCount > limit) {
+      return NextResponse.json(
+        { error: `Asset limit reached (${used}/${limit}).` },
+        { status: 403 },
       );
     }
 
