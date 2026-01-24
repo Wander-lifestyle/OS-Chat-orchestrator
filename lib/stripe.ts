@@ -9,7 +9,7 @@ export function getStripe() {
     throw new Error('Stripe is not configured.');
   }
   cachedStripe = new Stripe(secretKey, {
-    apiVersion: '2024-06-20',
+    apiVersion: '2025-12-15.clover',
   });
   return cachedStripe;
 }

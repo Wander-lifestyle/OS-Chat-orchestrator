@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { getStripe } from '@/lib/stripe';
 import { upsertBillingForOrg } from '@/lib/billing';
 
@@ -9,24 +10,22 @@ function toIso(timestamp: number | null | undefined) {
   return new Date(timestamp * 1000).toISOString();
 }
 
-async function handleSubscriptionUpdate(subscription: {
-  id: string;
-  customer: string;
-  status: string;
-  items: { data: Array<{ price: { id: string } }> };
-  current_period_end?: number | null;
-  trial_end?: number | null;
-  metadata?: Record<string, string>;
-}) {
+async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const orgId = subscription.metadata?.orgId;
   if (!orgId) return;
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+  const item = subscription.items?.data?.[0];
+  const periodEnd = item?.current_period_end ?? null;
   await upsertBillingForOrg({
     orgId,
-    stripeCustomerId: String(subscription.customer),
+    stripeCustomerId: customerId ?? null,
     stripeSubscriptionId: subscription.id,
     status: subscription.status,
     priceId: subscription.items.data[0]?.price?.id ?? null,
-    currentPeriodEnd: toIso(subscription.current_period_end ?? null),
+    currentPeriodEnd: toIso(periodEnd ?? null),
     trialEnd: toIso(subscription.trial_end ?? null),
   });
 }
@@ -68,15 +67,7 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as {
-          id: string;
-          customer: string;
-          status: string;
-          items: { data: Array<{ price: { id: string } }> };
-          current_period_end?: number | null;
-          trial_end?: number | null;
-          metadata?: Record<string, string>;
-        };
+        const subscription = event.data.object as Stripe.Subscription;
         await handleSubscriptionUpdate(subscription);
         break;
       }

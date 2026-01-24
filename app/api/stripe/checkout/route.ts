@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
 
   let customerId = billing?.stripeCustomerId ?? null;
   if (!customerId) {
-    const user = await clerkClient.users.getUser(userId);
-    const org = await clerkClient.organizations.getOrganization({ organizationId: orgId });
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const org = await client.organizations.getOrganization({ organizationId: orgId });
     const customer = await stripe.customers.create({
       email: user.emailAddresses?.[0]?.emailAddress,
       name: org.name ?? 'Light DAM Workspace',
