@@ -134,18 +134,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const limit = getAssetLimit();
-    const incomingCount = fileList.length;
-    const used = await getAssetCount(settings, Math.min(limit + incomingCount, 500));
-    if (used + incomingCount > limit) {
-      return NextResponse.json(
-        { error: `Asset limit reached (${used}/${limit}).` },
-        { status: 403 },
-      );
-    }
-
-    configureCloudinary(settings);
-
     const formData = await request.formData();
     const files = formData.getAll('files');
     const singleFile = formData.get('file');
@@ -161,6 +149,18 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const limit = getAssetLimit();
+    const incomingCount = fileList.length;
+    const used = await getAssetCount(settings, Math.min(limit + incomingCount, 500));
+    if (used + incomingCount > limit) {
+      return NextResponse.json(
+        { error: `Asset limit reached (${used}/${limit}).` },
+        { status: 403 },
+      );
+    }
+
+    configureCloudinary(settings);
 
     const assetNumber = (formData.get('assetNumber') as string | null)?.trim() ?? '';
     const photographer = (formData.get('photographer') as string | null)?.trim() ?? '';
