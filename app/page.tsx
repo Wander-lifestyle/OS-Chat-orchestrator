@@ -373,6 +373,13 @@ export default function LightDamPage() {
     return { label: 'Cloudinary connected', color: 'bg-os-success' };
   }, [error]);
 
+  const errorTitle = useMemo(() => {
+    if (!error) return '';
+    if (error.toLowerCase().includes('workspace')) return 'Workspace required';
+    if (error.toLowerCase().includes('cloudinary')) return 'Cloudinary not connected';
+    return 'Something needs attention';
+  }, [error]);
+
   return (
     <div className="min-h-screen bg-os-bg text-os-text">
       <div className="gradient-bg">
@@ -405,6 +412,12 @@ export default function LightDamPage() {
                   className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
                 >
                   Manage workspace
+                </a>
+                <a
+                  href="/settings/cloudinary"
+                  className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-os-text shadow-sm transition hover:bg-os-bg"
+                >
+                  Cloudinary settings
                 </a>
                 <UserButton
                   appearance={{
@@ -476,11 +489,21 @@ export default function LightDamPage() {
       <main className="mx-auto max-w-6xl px-6 py-8">
         {error && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-sm">
-            <div className="font-semibold">Light DAM is not configured yet.</div>
+            <div className="font-semibold">{errorTitle}</div>
             <p className="mt-1 text-red-600">
               {error}
               {results.missing?.length ? ` Missing: ${results.missing.join(', ')}` : ''}
             </p>
+            {error.toLowerCase().includes('cloudinary') && (
+              <a href="/settings/cloudinary" className="mt-2 inline-flex text-xs font-semibold underline">
+                Connect Cloudinary
+              </a>
+            )}
+            {error.toLowerCase().includes('workspace') && (
+              <a href="/onboarding" className="mt-2 inline-flex text-xs font-semibold underline">
+                Create workspace
+              </a>
+            )}
           </div>
         )}
 

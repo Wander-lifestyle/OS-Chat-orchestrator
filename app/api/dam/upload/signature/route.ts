@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
+import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 
 type SignatureRequest = {
   assetNumber?: string;
@@ -12,33 +13,7 @@ type SignatureRequest = {
   enableAutoTagging?: boolean;
 };
 
-const REQUIRED_ENV = [
-  'CLOUDINARY_CLOUD_NAME',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-];
-
 const DEFAULT_AUTO_TAGGING_THRESHOLD = 0.6;
-
-function getMissingEnv() {
-  return REQUIRED_ENV.filter((name) => !process.env[name]);
-}
-
-function configureCloudinary() {
-  const missing = getMissingEnv();
-  if (missing.length > 0) {
-    return { ok: false, missing };
-  }
-
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-
-  return { ok: true, missing: [] as string[] };
-}
 
 function sanitizeContextValue(value: string) {
   return value.replace(/[|=]/g, ' ').trim();
@@ -80,13 +55,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Workspace required.' }, { status: 403 });
     }
 
-    const configResult = configureCloudinary();
-    if (!configResult.ok) {
+    let settings;
+    try {
+      settings = await getCloudinarySettingsForOrg(orgId);
+    } catch (error) {
+      console.error('Cloudinary settings error:', error);
       return NextResponse.json(
-        { error: 'Cloudinary is not configured.', missing: configResult.missing },
+        { error: 'Supabase is not configured.' },
         { status: 500 },
       );
     }
+    if (!settings) {
+      return NextResponse.json(
+        { error: 'Cloudinary is not connected for this workspace.' },
+        { status: 400 },
+      );
+    }
+
+    configureCloudinary(settings);
 
     const payload = (await request.json()) as SignatureRequest;
     const assetNumber = payload.assetNumber?.trim() ?? '';
@@ -105,7 +91,7 @@ export async function POST(request: NextRequest) {
       description,
     });
 
-    const folder = process.env.CLOUDINARY_FOLDER?.trim();
+    const folder = settings.folder?.trim();
     const timestamp = Math.floor(Date.now() / 1000);
 
     const params: Record<string, string | number> = {
@@ -118,16 +104,13 @@ export async function POST(request: NextRequest) {
       params.auto_tagging = getAutoTaggingThreshold();
     }
 
-    const signature = cloudinary.utils.api_sign_request(
-      params,
-      process.env.CLOUDINARY_API_SECRET as string,
-    );
+    const signature = cloudinary.utils.api_sign_request(params, settings.apiSecret);
 
     return NextResponse.json({
       signature,
       timestamp,
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: settings.cloudName,
+      apiKey: settings.apiKey,
       folder: folder || null,
       context: context || null,
       tags: tagsValue || null,

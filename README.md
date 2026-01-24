@@ -40,6 +40,8 @@ Create a `.env.local` file or configure these in Vercel:
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key | Yes (Milestone 1) |
 | `CLERK_SECRET_KEY` | Clerk secret key | Yes (Milestone 1) |
 | `NEXT_PUBLIC_GA_ID` | Google Analytics measurement ID | No |
+| `SUPABASE_URL` | Supabase project URL | Yes (Milestone 2) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes (Milestone 2) |
 
 ## Authentication (Milestone 1)
 
@@ -53,6 +55,24 @@ Light DAM uses Clerk for authentication and organizations. Create a Clerk app, t
 - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
 Marketing page stays public at `/marketing`.
+
+## Supabase setup (Milestone 2)
+
+Create a `organization_cloudinary` table for BYOC credentials:
+
+```sql
+create table if not exists organization_cloudinary (
+  org_id text primary key,
+  cloud_name text not null,
+  api_key text not null,
+  api_secret text not null,
+  folder text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
+
+> Note: credentials are stored in Supabase and accessed via the service role key.
 
 ## How It Works
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
+import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 
 type SearchMode = 'strict' | 'semantic';
 
@@ -41,32 +42,6 @@ const STOPWORDS = new Set([
   'from', 'by', 'is', 'are', 'be', 'this', 'that', 'these', 'those', 'show',
   'find', 'search', 'get', 'need', 'looking',
 ]);
-
-const REQUIRED_ENV = [
-  'CLOUDINARY_CLOUD_NAME',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-];
-
-function getMissingEnv() {
-  return REQUIRED_ENV.filter((name) => !process.env[name]);
-}
-
-function configureCloudinary() {
-  const missing = getMissingEnv();
-  if (missing.length > 0) {
-    return { ok: false, missing };
-  }
-
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-  });
-
-  return { ok: true, missing: [] as string[] };
-}
 
 function escapeExpressionValue(value: string) {
   const trimmed = value.trim();
@@ -310,37 +285,32 @@ async function runSearch(request: NextRequest) {
     ? Math.min(Math.max(requestedLimit as number, 1), MAX_LIMIT)
     : DEFAULT_LIMIT;
 
-  const missing = getMissingEnv();
-  if (missing.length > 0) {
+  let settings;
+  try {
+    settings = await getCloudinarySettingsForOrg(orgId);
+  } catch (error) {
+    console.error('Cloudinary settings error:', error);
+    return NextResponse.json(
+      { error: 'Supabase is not configured.' },
+      { status: 500 },
+    );
+  }
+  if (!settings) {
     return NextResponse.json(
       {
-        error: 'Cloudinary is not configured.',
-        missing,
+        error: 'Cloudinary is not connected for this workspace.',
         query,
         total: 0,
         assets: [],
         next_cursor: null,
       },
-      { status: 500 },
+      { status: 400 },
     );
   }
 
-  const configResult = configureCloudinary();
-  if (!configResult.ok) {
-    return NextResponse.json(
-      {
-        error: 'Cloudinary is not configured.',
-        missing: configResult.missing,
-        query,
-        total: 0,
-        assets: [],
-        next_cursor: null,
-      },
-      { status: 500 },
-    );
-  }
+  configureCloudinary(settings);
 
-  const folder = process.env.CLOUDINARY_FOLDER?.trim();
+  const folder = settings.folder?.trim();
   const folderExpression = folder ? ` AND folder:${escapeExpressionValue(folder)}` : '';
   const expression = `resource_type:image AND type:upload${folderExpression}`;
 
