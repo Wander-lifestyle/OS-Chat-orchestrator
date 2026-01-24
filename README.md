@@ -1,194 +1,69 @@
-# Editorial OS
+# Editorial OS Bridge
 
-AI-first operating system for content and communications. One chat, all tools.
+Minimal Next.js API bridge that forwards chat messages to Claude Code
+subagents and returns their responses. No UI, no database, just a thin
+HTTP layer.
 
-## The Vision
+## Requirements
 
-```
-┌─────────────────────────────────────────────────┐
-│  ◈ Editorial OS                                 │
-├─────────────────────────────────────────────────┤
-│  [ Brief Engine ]  [ Campaign Deck ]  [ DAM ]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │ "Create a brief for EU eSIM launch..."   │  │
-│  └───────────────────────────────────────────┘  │
-│                                    [Send ✨]    │
-│                                                 │
-│  🤖 Editorial OS:                              │
-│  ✓ Brief created                               │
-│  ✓ Added to Campaign Deck (status: intake)     │
-│  ✓ Slack notified                              │
-│                                                 │
-│  [View Brief] [View in Deck] [Search DAM]      │
-└─────────────────────────────────────────────────┘
-```
+- Node.js 18+
+- Claude CLI installed and authenticated (`claude code run ...`)
+- Local agents at `~/.claude/agents/newsletter-level-{3,4,5}.md`
 
-## Quick Start
+## Setup
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy environment variables
-cp .env.example .env.local
-
-# Start development server
+cp .env.local.example .env.local
 npm run dev
 ```
 
-## Environment Variables
+The dev server runs on http://localhost:3000.
 
-**Required**: Set these in Vercel or your `.env.local`:
+## Endpoints
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
-| `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
+### GET /api/health
 
-## Deploy to Vercel
+Returns a simple health check:
 
-### Option 1: Via GitHub
+```json
+{ "status": "ok" }
+```
 
-1. Push this repo to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/new)
-3. Set environment variables in Project Settings → Environment Variables
-4. Deploy
+### POST /api/run-editorial-os
 
-### Option 2: Via CLI
+Input:
+
+```json
+{ "message": "string", "agentLevel": 3 }
+```
+
+Output:
+
+```json
+{ "status": "success", "response": "string" }
+```
+
+#### Example
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Preview deploy (staging)
-vercel
-
-# Production deploy
-vercel --prod
+curl -X POST http://localhost:3000/api/run-editorial-os \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Draft a newsletter intro","agentLevel":3}'
 ```
 
-### Setting Environment Variables in Vercel
+## Configuration
 
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
-   - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
+All orchestration logic lives in Claude Code. The bridge only needs
+access to the Claude CLI.
 
-## How It Works
+Optional environment variables:
 
-1. **You type** a natural language request
-2. **Router** determines which module handles it (Brief, Deck, DAM)
-3. **Executor** calls the appropriate API with timeout handling
-4. **Results** displayed with action buttons
+- `CLAUDE_CLI_PATH` (default: `claude`)
 
-## Connected Modules
+## Production
 
-| Module | Purpose | URL |
-|--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
-| Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
-
-## Example Queries
-
-**Creating briefs:**
-- "Create a brief for EU eSIM launch"
-- "New campaign for Q1 brand awareness targeting millennials"
-- "Make a brief called Holiday Sale for email and Instagram"
-
-**Checking campaigns:**
-- "Show me active campaigns"
-- "What's the status of the EU launch?"
-- "List all projects"
-
-**Finding assets:**
-- "Find hero images for Instagram"
-- "Search for travel photos"
-- "I need visuals for the EU campaign"
-
-## Architecture
-
+```bash
+npm run build
+npm run start
 ```
-User Query
-    ↓
-Editorial OS (API Route)
-    ↓
-Router (with 5s timeout)
-    ↓
-┌───────────┬───────────┬───────────┐
-│  Brief    │  Campaign │   Light   │
-│  Engine   │   Deck    │    DAM    │
-└───────────┴───────────┴───────────┘
-    ↓
-Results + Actions
-```
-
-## The Flow
-
-```
-"Create a brief for EU eSIM launch"
-    ↓
-API Route: POST /api/chat
-    ↓
-Router: module=brief, intent=create
-    ↓
-POST brief-engine.vercel.app/api/brief/create (5s timeout)
-    ↓
-Brief Engine: Creates brief + POSTs to Campaign Deck
-    ↓
-Campaign Deck: Creates ledger entry (intake)
-    ↓
-Editorial OS: "✓ Brief created. ✓ Added to Deck."
-    ↓
-Action buttons: [View Brief] [View in Deck]
-```
-
-## Project Structure
-
-```
-editorial-os/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # API endpoint for chat
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main chat interface
-├── components/
-│   ├── ChatInput.tsx         # Message input component
-│   ├── ChatMessage.tsx       # Message display component
-│   ├── ErrorBoundary.tsx     # Error handling wrapper
-│   └── ModuleTabs.tsx        # Module navigation tabs
-├── lib/
-│   ├── router.ts             # Query routing logic
-│   └── types.ts              # TypeScript types
-├── .env.example              # Environment variables template
-├── .gitignore
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-└── tsconfig.json
-```
-
-## This is the Product
-
-Not individual tools. One unified interface.
-
-- **Solopreneur**: "Create a brief for my launch" → Done
-- **Marketing team**: "Show active campaigns" → Dashboard
-- **Agency**: "Find assets for client X" → Results
-
-All from one chat box.
-
----
-
-Part of Editorial OS. Built for content operations at any scale.

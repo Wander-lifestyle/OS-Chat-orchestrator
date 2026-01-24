@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Editorial OS',
-  description: 'AI-first operating system for content and communications. One chat, all tools.',
+  title: 'Editorial OS Bridge',
+  description: 'Minimal bridge to Claude Code subagents.',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="grain antialiased">
+      <body className="min-h-screen bg-white text-slate-900 antialiased">
         {children}
       </body>
     </html>
