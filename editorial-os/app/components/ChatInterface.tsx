@@ -1,16 +1,31 @@
 "use client";
 
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 
 interface ChatInterfaceProps {
   onSubmit: (message: string) => Promise<void>;
   loading: boolean;
+  clientId: string;
+  workspaceId: string;
+  onClientIdChange: (value: string) => void;
+  onWorkspaceIdChange: (value: string) => void;
+  briefUrl?: string;
+  damUrl?: string;
 }
 
-export default function ChatInterface({ onSubmit, loading }: ChatInterfaceProps) {
+export default function ChatInterface({
+  onSubmit,
+  loading,
+  clientId,
+  workspaceId,
+  onClientIdChange,
+  onWorkspaceIdChange,
+  briefUrl,
+  damUrl,
+}: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!message.trim()) return;
 
@@ -19,45 +34,61 @@ export default function ChatInterface({ onSubmit, loading }: ChatInterfaceProps)
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-2xl mx-auto p-4 border rounded-lg bg-white"
-    >
+    <form onSubmit={handleSubmit} className="chat-form">
+      <div className="chat-fields">
+        <label className="chat-field">
+          <span>Client ID (optional)</span>
+          <input
+            type="text"
+            value={clientId}
+            onChange={(event) => onClientIdChange(event.target.value)}
+            placeholder="e.g. wander"
+          />
+        </label>
+        <label className="chat-field">
+          <span>Workspace ID (optional)</span>
+          <input
+            type="text"
+            value={workspaceId}
+            onChange={(event) => onWorkspaceIdChange(event.target.value)}
+            placeholder="e.g. north-america"
+          />
+        </label>
+      </div>
+
       <textarea
         value={message}
         onChange={(event) => setMessage(event.target.value)}
         placeholder="Describe what you want to create..."
         disabled={loading}
-        className="w-full p-3 border rounded"
-        rows={3}
+        rows={4}
       />
 
-      <div className="mt-4 flex gap-2 flex-wrap">
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Processing...' : 'Create'}
+      <div className="chat-actions">
+        <button type="submit" disabled={loading}>
+          {loading ? 'Processing...' : 'Send request'}
         </button>
-        <button
-          type="button"
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-        >
-          DAM
-        </button>
-        <button
-          type="button"
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-        >
-          Brief
-        </button>
-        <button
-          type="button"
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-        >
-          Schedule
-        </button>
+      </div>
+
+      <div className="chat-tabs">
+        {briefUrl ? (
+          <a className="chat-tab" href={briefUrl} target="_blank" rel="noreferrer">
+            Brief entry
+          </a>
+        ) : (
+          <span className="chat-tab disabled" title="Set NEXT_PUBLIC_BRIEF_ENTRY_URL">
+            Brief entry
+          </span>
+        )}
+        {damUrl ? (
+          <a className="chat-tab" href={damUrl} target="_blank" rel="noreferrer">
+            Light DAM
+          </a>
+        ) : (
+          <span className="chat-tab disabled" title="Set NEXT_PUBLIC_LIGHT_DAM_URL">
+            Light DAM
+          </span>
+        )}
       </div>
     </form>
   );

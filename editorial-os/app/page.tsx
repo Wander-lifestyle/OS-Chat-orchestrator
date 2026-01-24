@@ -7,6 +7,11 @@ import ProjectStatus from './components/ProjectStatus';
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
+
+  const briefUrl = process.env.NEXT_PUBLIC_BRIEF_ENTRY_URL;
+  const damUrl = process.env.NEXT_PUBLIC_LIGHT_DAM_URL;
 
   const handleSubmit = async (message: string) => {
     setLoading(true);
@@ -16,6 +21,8 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userMessage: message,
+          clientId: clientId || undefined,
+          workspaceId: workspaceId || undefined,
           trackId: 3,
         }),
       });
@@ -31,22 +38,44 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8">Editorial OS</h1>
-
-        <div className="mb-8">
-          <ChatInterface onSubmit={handleSubmit} loading={loading} />
-          {response && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
-              <h3 className="font-bold mb-2">Agent Response</h3>
-              <p className="text-sm">{response}</p>
-            </div>
-          )}
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1>Editorial OS</h1>
+          <p>Campaign command center</p>
         </div>
 
-        <ProjectStatus trackId="3" />
-      </div>
+        <ProjectStatus
+          trackId="3"
+          clientId={clientId || undefined}
+          workspaceId={workspaceId || undefined}
+        />
+      </aside>
+
+      <main className="main">
+        <div className="main-header">
+          <h2>Start a request</h2>
+          <p>Describe the work you want shipped. The agent will handle the rest.</p>
+        </div>
+
+        <ChatInterface
+          onSubmit={handleSubmit}
+          loading={loading}
+          clientId={clientId}
+          workspaceId={workspaceId}
+          onClientIdChange={setClientId}
+          onWorkspaceIdChange={setWorkspaceId}
+          briefUrl={briefUrl}
+          damUrl={damUrl}
+        />
+
+        {response && (
+          <div className="response-panel">
+            <div className="response-title">Agent response</div>
+            <p>{response}</p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

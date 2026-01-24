@@ -16,7 +16,10 @@ Production-grade architecture for an AI-first Editorial OS using Claude + Notion
    ```bash
    npm install
    ```
-2. Create `.env.local` using the template in this repo.
+2. Create `.env.local` from the template:
+   ```bash
+   cp .env.local.example .env.local
+   ```
 3. Create the Notion databases using the schema below.
 4. Run locally:
    ```bash
@@ -80,6 +83,10 @@ NOTION_LEDGER_DATABASE_ID=abc123def456
 NOTION_CLIENTS_DATABASE_ID=xyz789abc
 NOTION_BRIEFS_DATABASE_ID=def456xyz
 
+# Optional quick links for the UI
+NEXT_PUBLIC_BRIEF_ENTRY_URL=https://www.notion.so/your-briefs-database
+NEXT_PUBLIC_LIGHT_DAM_URL=https://your-dam-url.example.com
+
 # Cloudinary (optional for now)
 CLOUDINARY_CLOUD_NAME=your_cloud
 CLOUDINARY_API_KEY=your_key
@@ -92,6 +99,33 @@ BEEHIIV_PUBLICATION_ID=your_publication_id
 # Slack (optional)
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
+
+---
+
+## Vercel Deployment (Non-Technical)
+
+1. In Vercel, click **New Project**.
+2. Select this GitHub repo.
+3. In **Settings → General**, set **Root Directory** to:
+   ```
+   editorial-os
+   ```
+4. In **Settings → Environment Variables**, paste the same values from `.env.local`.
+5. Redeploy.
+
+---
+
+## Level 3 Newsletter: Non-Technical Checklist
+
+1. **Create the Notion databases** using the schema below.
+2. **Share those databases** with your Notion integration (Connections → invite the integration).
+3. **Add a client row** in the Clients database with:
+   - Client ID (you will type this in the UI)
+   - Brand Voice
+   - Beehiiv API Key + Publication ID
+   - Slack Webhook (optional)
+4. **Set the Vercel environment variables**.
+5. In the UI, enter the **Client ID** before sending your request.
 
 ---
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface Campaign {
   id: string;
@@ -12,77 +12,132 @@ interface Campaign {
   url: string;
 }
 
-export default function ProjectStatus({ trackId }: { trackId?: string }) {
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  intake: 'Intake',
+  active: 'Active',
+  scheduled: 'Scheduled',
+  shipped: 'Shipped',
+};
+
+const STATUS_CLASSNAMES: Record<string, string> = {
+  draft: 'status-dot status-dot--draft',
+  intake: 'status-dot status-dot--intake',
+  active: 'status-dot status-dot--active',
+  scheduled: 'status-dot status-dot--scheduled',
+  shipped: 'status-dot status-dot--shipped',
+};
+
+export default function ProjectStatus({
+  trackId,
+  clientId,
+  workspaceId,
+}: {
+  trackId?: string;
+  clientId?: string;
+  workspaceId?: string;
+}) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchLedger = async () => {
-      try {
-        const url = trackId ? `/api/notion/ledger?trackId=${trackId}` : '/api/notion/ledger';
-        const response = await fetch(url);
-        const data = await response.json();
+  const fetchLedger = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (trackId) params.set('trackId', trackId);
+      if (clientId) params.set('clientId', clientId);
+      if (workspaceId) params.set('workspaceId', workspaceId);
 
-        if (data.success) {
-          setCampaigns(data.campaigns || []);
-        }
-      } catch (error) {
-        console.error('Ledger fetch error:', error);
-      } finally {
-        setLoading(false);
+      const url = params.toString()
+        ? `/api/notion/ledger?${params.toString()}`
+        : '/api/notion/ledger';
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        setCampaigns(data.campaigns || []);
       }
-    };
+    } catch (error) {
+      console.error('Ledger fetch error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [trackId, clientId, workspaceId]);
 
+  useEffect(() => {
     fetchLedger();
 
     const interval = setInterval(fetchLedger, 5000);
     return () => clearInterval(interval);
-  }, [trackId]);
+  }, [fetchLedger]);
 
-  if (loading) return <div className="p-4">Loading...</div>;
+  const statusCounts = campaigns.reduce<Record<string, number>>((acc, campaign) => {
+    const key = (campaign.status || 'draft').toLowerCase();
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Campaign Ledger</h2>
-      <table className="w-full border-collapse border border-gray-300">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border p-2 text-left">Campaign</th>
-            <th className="border p-2 text-left">Track</th>
-            <th className="border p-2 text-left">Status</th>
-            <th className="border p-2 text-left">Approval</th>
-            <th className="border p-2 text-left">Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {campaigns.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="border p-4 text-center text-gray-500">
-                No campaigns yet
-              </td>
-            </tr>
-          ) : (
-            campaigns.map((campaign) => (
-              <tr key={campaign.id} className="hover:bg-gray-50">
-                <td className="border p-2">
-                  <a
-                    href={campaign.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {campaign.name}
-                  </a>
-                </td>
-                <td className="border p-2">{campaign.track}</td>
-                <td className="border p-2">{campaign.status}</td>
-                <td className="border p-2">{campaign.approvalStatus}</td>
-                <td className="border p-2">{campaign.createdDate}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+    <div className="sidebar-section">
+      <div className="sidebar-section-header">
+        <span>Status</span>
+        <button
+          type="button"
+          className="sidebar-action"
+          onClick={() => {
+            setLoading(true);
+            fetchLedger();
+          }}
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="status-list">
+        {Object.keys(statusCounts).length === 0 && !loading && (
+          <div className="status-empty">No campaigns yet</div>
+        )}
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <div key={status} className="status-item">
+            <span className={STATUS_CLASSNAMES[status] || 'status-dot'} />
+            <span>{STATUS_LABELS[status] || status}</span>
+            <span className="status-count">{count}</span>
+          </div>
+        ))}
+        {loading && <div className="status-empty">Loading...</div>}
+      </div>
+
+      <div className="sidebar-section-divider" />
+
+      <div className="sidebar-section-header">
+        <span>Projects</span>
+      </div>
+
+      <div className="project-list">
+        {loading && campaigns.length === 0 && <div className="project-empty">Loading...</div>}
+        {!loading && campaigns.length === 0 && (
+          <div className="project-empty">No projects found yet</div>
+        )}
+        {campaigns.map((campaign) => {
+          const statusKey = (campaign.status || 'draft').toLowerCase();
+          return (
+            <a
+              key={campaign.id}
+              href={campaign.url}
+              target="_blank"
+              rel="noreferrer"
+              className="project-card"
+            >
+              <div className="project-header">
+                <span className="project-name">{campaign.name}</span>
+                <span className={STATUS_CLASSNAMES[statusKey] || 'status-dot'} />
+              </div>
+              <div className="project-meta">
+                {campaign.track} • {campaign.status}
+              </div>
+            </a>
+          );
+        })}
+      </div>
     </div>
   );
 }
