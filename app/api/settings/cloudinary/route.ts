@@ -39,11 +39,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch settings.' }, { status: 500 });
   }
 
+  const row = data as { cloud_name: string; api_key: string; folder: string | null };
+
   return NextResponse.json({
     connected: true,
-    cloudName: data.cloud_name,
-    apiKey: maskValue(data.api_key),
-    folder: data.folder ?? '',
+    cloudName: row.cloud_name,
+    apiKey: maskValue(row.api_key),
+    folder: row.folder ?? '',
   });
 }
 
@@ -73,14 +75,16 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase
     .from('organization_cloudinary')
     .upsert(
-      {
-        org_id: orgId,
-        cloud_name: cloudName,
-        api_key: apiKey,
-        api_secret: apiSecret,
-        folder,
-        updated_at: new Date().toISOString(),
-      },
+      [
+        {
+          org_id: orgId,
+          cloud_name: cloudName,
+          api_key: apiKey,
+          api_secret: apiSecret,
+          folder,
+          updated_at: new Date().toISOString(),
+        },
+      ] as any,
       { onConflict: 'org_id' },
     );
 
