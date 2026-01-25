@@ -1,8 +1,8 @@
 # Editorial OS Bridge
 
-Minimal Next.js API bridge that forwards chat messages to Claude Code
-subagents and returns their responses. No UI, no database, just a thin
-HTTP layer.
+Minimal Next.js bridge that includes a lightweight chat UI and a single
+API endpoint. It forwards messages to Claude Code subagents and returns
+their responses.
 
 ## Requirements
 
@@ -19,6 +19,8 @@ npm run dev
 ```
 
 The dev server runs on http://localhost:3000.
+
+Open the UI at http://localhost:3000 and send a message from the chat.
 
 ## Endpoints
 
@@ -37,6 +39,9 @@ Input:
 ```json
 { "message": "string", "agentLevel": 3 }
 ```
+
+`agentLevel` accepts 3, 4, or 5. The UI displays levels 1-5, but levels
+1-2 are marked as coming soon and will run at level 3 for now.
 
 Output:
 
@@ -60,6 +65,7 @@ access to the Claude CLI.
 Optional environment variables:
 
 - `CLAUDE_CLI_PATH` (default: `claude`)
+- `NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL` (default: same origin)
 
 ## Production
 
