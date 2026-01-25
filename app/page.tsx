@@ -8,6 +8,25 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  tools?: ToolActivity[];
+};
+
+type ToolActivity = {
+  name: string;
+  ok: boolean;
+  summary: string;
+  data?: {
+    id?: string;
+    status?: string;
+    url?: string;
+    channel?: string;
+  };
+};
+
+type RunEditorialResponse = {
+  status?: string;
+  response?: string;
+  tools?: ToolActivity[];
 };
 
 type AgentLevelOption = {
@@ -34,6 +53,11 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL || '')
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(' ');
+
+const formatToolName = (name: string) =>
+  name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -160,6 +184,45 @@ const ChatMessages = ({
           )}
         >
           <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.tools && message.tools.length > 0 && (
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <div className="font-medium text-slate-700">Tool activity</div>
+              <ul className="mt-2 space-y-2">
+                {message.tools.map((tool, index) => (
+                  <li key={`${tool.name}-${index}`} className="flex gap-2">
+                    <span
+                      className={
+                        tool.ok ? 'text-emerald-600' : 'text-rose-600'
+                      }
+                    >
+                      {tool.ok ? '✓' : '✕'}
+                    </span>
+                    <div>
+                      <div className="font-medium text-slate-700">
+                        {formatToolName(tool.name)}
+                      </div>
+                      <div className="text-slate-600">{tool.summary}</div>
+                      {tool.data?.status && (
+                        <div className="text-slate-500">
+                          Status: {tool.data.status}
+                        </div>
+                      )}
+                      {tool.data?.url && (
+                        <a
+                          href={tool.data.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-600 underline hover:text-slate-800"
+                        >
+                          Open link
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     ))}
@@ -217,7 +280,7 @@ const ProjectSidebar = ({
     </div>
     <div className="space-y-3 px-4 py-4 text-sm text-slate-600">
       <p className="font-medium text-slate-900">Editorial OS</p>
-      <p>Bridge + Claude Code</p>
+      <p>Bridge + Anthropic</p>
       <p>Notion outputs</p>
     </div>
   </aside>
@@ -264,21 +327,31 @@ export default function Home() {
         }
       );
 
-      let data: { status?: string; response?: string } | null = null;
+      let data: RunEditorialResponse | null = null;
       try {
         data = await response.json();
       } catch (error) {
         console.error('Failed to parse response JSON', error);
       }
 
+      const tools = Array.isArray(data?.tools) ? data?.tools : undefined;
+
       if (!response.ok) {
-        throw new Error(data?.response || response.statusText);
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Error: ${data?.response || response.statusText}`,
+          tools,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        return;
       }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data?.response || 'Command completed with no output.',
+        tools,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {

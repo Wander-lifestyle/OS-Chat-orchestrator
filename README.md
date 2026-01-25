@@ -39,15 +39,21 @@ Returns a simple health check:
 Input:
 
 ```json
-{ "message": "string", "agentLevel": 3 }
+{ "message": "string", "agentLevel": 3, "os": "newsletter" }
 ```
 
-`agentLevel` accepts 3, 4, or 5.
+`agentLevel` accepts 3, 4, or 5. `os` is optional (defaults to `newsletter`).
 
 Output:
 
 ```json
-{ "status": "success", "response": "string" }
+{
+  "status": "success",
+  "response": "string",
+  "tools": [
+    { "name": "create_ledger_entry", "ok": true, "summary": "..." }
+  ]
+}
 ```
 
 #### Example
@@ -55,7 +61,7 @@ Output:
 ```bash
 curl -X POST http://localhost:3000/api/run-editorial-os \
   -H "Content-Type: application/json" \
-  -d '{"message":"Draft a newsletter intro","agentLevel":3}'
+  -d '{"message":"Draft a newsletter intro","agentLevel":3,"os":"newsletter"}'
 ```
 
 ## Configuration
@@ -69,10 +75,14 @@ Environment variables:
 - `ANTHROPIC_MODEL` (optional)
 - `ANTHROPIC_MAX_TOKENS` (optional)
 - `ANTHROPIC_TEMPERATURE` (optional)
+- `EDITORIAL_OS_TOOL_TIMEOUT_MS` (optional)
 - `NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL` (default: same origin)
 - `CORS_ALLOW_ORIGIN` (default: `*`)
 - `NOTION_TOKEN`, `NOTION_LEDGER_DB_ID`
-- `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`
+- `NOTION_VERSION` (optional, default `2022-06-28`)
+- `NOTION_TITLE_FIELD`, `NOTION_STATUS_FIELD`, `NOTION_STATUS_TYPE`
+- `NOTION_SUMMARY_FIELD`, `NOTION_TAGS_FIELD`
+- `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`, `BEEHIIV_API_BASE_URL`
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 - `SLACK_BOT_TOKEN`
 
@@ -83,9 +93,12 @@ Agent prompts live in the `/agents` directory:
 - `agents/newsletter-level-3.md`
 - `agents/newsletter-level-4.md`
 - `agents/newsletter-level-5.md`
+- `agents/social-level-3.md`
+- `agents/social-level-4.md`
+- `agents/social-level-5.md`
 
-To add a new OS later (e.g. Social OS), create new prompt files and
-extend the agent selection logic in the API route.
+To add a new OS later, create new prompt files and allow the `os` value
+in the API route.
 
 ## Tools
 
@@ -96,7 +109,8 @@ Tool helpers are intentionally thin and live in `/lib`:
 - `lib/cloudinary.ts`
 - `lib/slack.ts`
 
-These are stubbed by default and are easy to replace with real API calls.
+These call real APIs. Keep credentials in `.env.local` and update any
+payload mappings as your services evolve.
 
 ## Bridge Notes
 
