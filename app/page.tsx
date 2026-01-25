@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-type AgentLevel = 1 | 2 | 3 | 4 | 5;
+type AgentLevel = 3 | 4 | 5;
 
 type Message = {
   id: string;
@@ -14,12 +14,9 @@ type AgentLevelOption = {
   level: AgentLevel;
   name: string;
   description: string;
-  disabled?: boolean;
 };
 
 const AGENT_LEVEL_OPTIONS: AgentLevelOption[] = [
-  { level: 1, name: 'Level 1', description: 'Quick tasks', disabled: true },
-  { level: 2, name: 'Level 2', description: 'Simple queries', disabled: true },
   { level: 3, name: 'Level 3', description: 'Fast and efficient' },
   { level: 4, name: 'Level 4', description: 'Balanced' },
   { level: 5, name: 'Level 5', description: 'Most capable' },
@@ -77,20 +74,13 @@ const AgentLevelSelector = ({
         className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm"
       >
         {AGENT_LEVEL_OPTIONS.map((option) => (
-          <option
-            key={option.level}
-            value={option.level}
-            disabled={option.disabled}
-          >
+          <option key={option.level} value={option.level}>
             {option.name} - {option.description}
-            {option.disabled ? ' (coming soon)' : ''}
           </option>
         ))}
       </select>
       <span className="text-xs text-slate-500">
-        {selected?.disabled
-          ? 'Levels 1-2 are coming soon. Using Level 3 for now.'
-          : selected?.description}
+        {selected?.description}
       </span>
     </div>
   );
@@ -261,8 +251,6 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    const effectiveLevel = agentLevel < 3 ? 3 : agentLevel;
-
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/run-editorial-os`,
@@ -271,7 +259,7 @@ export default function Home() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: trimmed,
-            agentLevel: effectiveLevel,
+            agentLevel,
           }),
         }
       );

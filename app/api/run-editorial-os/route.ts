@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import path from 'path';
+import { readFile } from 'fs/promises';
+import type {
+  ContentBlock,
+  MessageParam,
+  Tool,
+  ToolResultBlockParam,
+  ToolUseBlock,
+} from '@anthropic-ai/sdk/resources/messages';
+import {
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_MODEL,
+  DEFAULT_TEMPERATURE,
+  getAnthropicClient,
+} from '@/lib/anthropic';
+import { createLedgerEntry } from '@/lib/notion-ledger';
+import { scheduleNewsletter } from '@/lib/beehiiv';
+import { searchHeroImage } from '@/lib/cloudinary';
+import { postNotification } from '@/lib/slack';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Bridge endpoint: validate input, run Claude CLI, return output.
-const execFileAsync = promisify(execFile);
-const TIMEOUT_MS = 60_000;
-const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const ALLOWED_LEVELS = new Set([3, 4, 5]);
+const MAX_TOOL_STEPS = 6;
+const AGENTS_DIR = path.join(process.cwd(), 'agents');
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -52,6 +68,116 @@ const jsonResponse = (
   init?: { status?: number }
 ) => withCors(NextResponse.json(body, init));
 
+const TOOLS: Tool[] = [
+  {
+    name: 'create_ledger_entry',
+    description:
+      'Create a campaign ledger entry in Notion. Use after major milestones or when asked to log work.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Entry title.' },
+        summary: { type: 'string', description: 'Short summary of work done.' },
+        status: { type: 'string', description: 'Status label, e.g. drafted.' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for filtering.',
+        },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'schedule_beehiiv_newsletter',
+    description:
+      'Schedule a newsletter in Beehiiv. Use when the user requests scheduling or sending.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'Newsletter subject line.' },
+        content: {
+          type: 'string',
+          description: 'Newsletter body content or key sections.',
+        },
+        sendAt: {
+          type: 'string',
+          description: 'ISO-8601 datetime for scheduling.',
+        },
+        audience: {
+          type: 'string',
+          description: 'Audience segment or list.',
+        },
+      },
+      required: ['subject'],
+    },
+  },
+  {
+    name: 'search_cloudinary_image',
+    description:
+      'Search Cloudinary for a hero image to accompany the newsletter.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search keywords.' },
+        tags: { type: 'array', items: { type: 'string' } },
+        orientation: {
+          type: 'string',
+          description: 'Orientation preference such as landscape.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'post_slack_notification',
+    description:
+      'Post a Slack notification to keep stakeholders informed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        channel: { type: 'string', description: 'Slack channel name or ID.' },
+        message: { type: 'string', description: 'Message to post.' },
+      },
+      required: ['channel', 'message'],
+    },
+  },
+];
+
+const TOOL_HANDLERS: Record<string, (input: unknown) => Promise<unknown>> = {
+  create_ledger_entry: async (input) => createLedgerEntry(input as any),
+  schedule_beehiiv_newsletter: async (input) => scheduleNewsletter(input as any),
+  search_cloudinary_image: async (input) => searchHeroImage(input as any),
+  post_slack_notification: async (input) => postNotification(input as any),
+};
+
+const loadAgentPrompt = async (level: 3 | 4 | 5) => {
+  const agentPath = path.join(AGENTS_DIR, `newsletter-level-${level}.md`);
+  return readFile(agentPath, 'utf8');
+};
+
+const extractToolUses = (content: ContentBlock[]) =>
+  content.filter((block) => block.type === 'tool_use') as ToolUseBlock[];
+
+const extractText = (content: ContentBlock[]) =>
+  content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim();
+
+const toToolResult = (
+  toolUse: ToolUseBlock,
+  payload: unknown,
+  isError = false
+): ToolResultBlockParam => ({
+  type: 'tool_result',
+  tool_use_id: toolUse.id,
+  content:
+    typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2),
+  is_error: isError || undefined,
+});
+
 export async function OPTIONS() {
   return withCors(new NextResponse(null, { status: 204 }));
 }
@@ -93,58 +219,78 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const cliPath = process.env.CLAUDE_CLI_PATH || 'claude';
-  const agentHandle = `@newsletter-level-${agentLevel}`;
-
   try {
-    // Execute the Claude Code subagent without a shell to avoid injection.
-    const { stdout, stderr } = await execFileAsync(
-      cliPath,
-      ['code', 'run', agentHandle, message],
-      { timeout: TIMEOUT_MS, maxBuffer: MAX_BUFFER_BYTES, encoding: 'utf8' }
-    );
+    const client = getAnthropicClient();
+    const systemPrompt = await loadAgentPrompt(agentLevel);
+    const messages: MessageParam[] = [{ role: 'user', content: message }];
 
-    const output = [stdout, stderr]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
-      .filter(Boolean)
-      .join('\n');
+    let lastText = '';
 
-    return jsonResponse({
-      status: 'success',
-      response: output || 'Command completed with no output.',
-    });
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException & {
-      stdout?: string;
-      stderr?: string;
-      signal?: string;
-      killed?: boolean;
-    };
+    for (let step = 0; step < MAX_TOOL_STEPS; step += 1) {
+      const response = await client.messages.create({
+        model: DEFAULT_MODEL,
+        max_tokens: DEFAULT_MAX_TOKENS,
+        temperature: DEFAULT_TEMPERATURE,
+        system: systemPrompt,
+        messages,
+        tools: TOOLS,
+      });
 
-    let response = 'Failed to run Claude Code.';
-    if (err.code === 'ENOENT') {
-      response =
-        'Claude CLI not found. Install it or set CLAUDE_CLI_PATH in .env.local.';
-    } else if (err.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
-      response =
-        'Claude output exceeded the buffer limit. Reduce output size or increase MAX_BUFFER_BYTES.';
-    } else if (err.killed || err.signal) {
-      response = `Claude command timed out after ${TIMEOUT_MS / 1000} seconds.`;
-    } else {
-      const details =
-        (typeof err.stderr === 'string' && err.stderr.trim()) ||
-        (typeof err.stdout === 'string' && err.stdout.trim()) ||
-        err.message;
-      if (details) {
-        response = `Claude command failed: ${details}`;
+      const content = response.content ?? [];
+      const toolUses = extractToolUses(content);
+      const text = extractText(content);
+
+      if (text) {
+        lastText = text;
       }
+
+      if (toolUses.length === 0) {
+        return jsonResponse({
+          status: 'success',
+          response: lastText || 'No response text returned.',
+        });
+      }
+
+      const toolResults: ToolResultBlockParam[] = await Promise.all(
+        toolUses.map(async (toolUse) => {
+          const handler = TOOL_HANDLERS[toolUse.name];
+          if (!handler) {
+            return toToolResult(
+              toolUse,
+              { error: `Unknown tool: ${toolUse.name}` },
+              true
+            );
+          }
+
+          try {
+            const result = await handler(toolUse.input);
+            return toToolResult(toolUse, result);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Tool execution failed.';
+            return toToolResult(toolUse, { error: message }, true);
+          }
+        })
+      );
+
+      messages.push({
+        role: 'assistant',
+        content: content as MessageParam['content'],
+      });
+      messages.push({ role: 'user', content: toolResults });
     }
 
-    console.error('Editorial OS bridge: command failed', {
-      agentLevel,
-      error: err,
-    });
-
-    return jsonResponse({ status: 'error', response }, { status: 500 });
+    return jsonResponse(
+      {
+        status: 'error',
+        response: 'Tool loop exceeded maximum steps.',
+      },
+      { status: 500 }
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Anthropic request failed.';
+    console.error('Editorial OS bridge: request failed', error);
+    return jsonResponse({ status: 'error', response: message }, { status: 500 });
   }
 }
