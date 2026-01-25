@@ -1,14 +1,17 @@
 # Editorial OS Bridge
 
-Minimal Next.js bridge that includes a lightweight chat UI and a single
-API endpoint. It forwards messages to Claude Code subagents and returns
-their responses.
+Lightweight Next.js project that pairs a clean chat UI with a single
+bridge API. Messages are forwarded to Claude Code subagents and the
+responses are returned to the browser. No database, no orchestration
+layer—just UI → API → CLI delegation → Claude Code.
 
 ## Requirements
 
 - Node.js 18+
 - Claude CLI installed and authenticated (`claude code run ...`)
 - Local agents at `~/.claude/agents/newsletter-level-{3,4,5}.md`
+- Local skills at `~/.claude/skills/editorial-os/`
+- Claude Code desktop app running in the background
 
 ## Setup
 
@@ -66,6 +69,15 @@ Optional environment variables:
 
 - `CLAUDE_CLI_PATH` (default: `claude`)
 - `NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL` (default: same origin)
+- `CORS_ALLOW_ORIGIN` (default: `*`)
+- `NOTION_TOKEN` (used by your Claude Code skills/scripts)
+- `NOTION_LEDGER_DB_ID` (used by your Claude Code skills/scripts)
+
+## Bridge Notes
+
+- The API only forwards requests to `claude code run`.
+- No database or session state is stored here.
+- Keep your Claude Code agents and skills configured locally.
 
 ## Production
 

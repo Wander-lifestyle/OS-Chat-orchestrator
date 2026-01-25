@@ -10,6 +10,12 @@ const execFileAsync = promisify(execFile);
 const TIMEOUT_MS = 60_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const ALLOWED_LEVELS = new Set([3, 4, 5]);
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
 
 type RunEditorialRequest = {
   message?: unknown;
@@ -34,6 +40,22 @@ const toMessage = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const withCors = (response: NextResponse) => {
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  return response;
+};
+
+const jsonResponse = (
+  body: Record<string, unknown>,
+  init?: { status?: number }
+) => withCors(NextResponse.json(body, init));
+
+export async function OPTIONS() {
+  return withCors(new NextResponse(null, { status: 204 }));
+}
+
 export async function POST(request: NextRequest) {
   let payload: RunEditorialRequest;
 
@@ -41,14 +63,14 @@ export async function POST(request: NextRequest) {
     payload = await request.json();
   } catch (error) {
     console.error('Editorial OS bridge: invalid JSON', error);
-    return NextResponse.json(
+    return jsonResponse(
       { status: 'error', response: 'Invalid JSON body.' },
       { status: 400 }
     );
   }
 
   if (!payload || typeof payload !== 'object') {
-    return NextResponse.json(
+    return jsonResponse(
       { status: 'error', response: 'Request body must be a JSON object.' },
       { status: 400 }
     );
@@ -58,14 +80,14 @@ export async function POST(request: NextRequest) {
   const agentLevel = toAgentLevel(payload.agentLevel);
 
   if (!message) {
-    return NextResponse.json(
+    return jsonResponse(
       { status: 'error', response: 'message must be a non-empty string.' },
       { status: 400 }
     );
   }
 
   if (!agentLevel) {
-    return NextResponse.json(
+    return jsonResponse(
       { status: 'error', response: 'agentLevel must be 3, 4, or 5.' },
       { status: 400 }
     );
@@ -87,7 +109,7 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n');
 
-    return NextResponse.json({
+    return jsonResponse({
       status: 'success',
       response: output || 'Command completed with no output.',
     });
@@ -123,6 +145,6 @@ export async function POST(request: NextRequest) {
       error: err,
     });
 
-    return NextResponse.json({ status: 'error', response }, { status: 500 });
+    return jsonResponse({ status: 'error', response }, { status: 500 });
   }
 }

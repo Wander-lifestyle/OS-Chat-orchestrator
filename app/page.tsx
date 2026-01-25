@@ -176,7 +176,7 @@ const ChatMessages = ({
     {isLoading && (
       <div className="flex justify-start">
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-          Running agent...
+          Claude is thinking...
         </div>
       </div>
     )}
