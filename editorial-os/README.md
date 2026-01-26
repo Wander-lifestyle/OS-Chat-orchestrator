@@ -1,0 +1,233 @@
+# Editorial OS - Complete Implementation
+
+Production-grade architecture for an AI-first Editorial OS using Claude + Notion + Next.js.
+
+## Architecture
+
+- **Claude** = reasoning + content generation (never mutates data directly)
+- **Next.js API** = orchestration + control
+- **Tool Runtime** = executes side effects (Notion, Cloudinary, Beehiiv, Slack)
+- **Notion** = system of record (ledger, briefs, clients)
+- **UI** = triggers agents + displays live ledger
+
+## Quick Start
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create `.env.local` from the template:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+3. Create the Notion databases using the schema below.
+4. Run locally:
+   ```bash
+   npm run dev
+   ```
+5. Open http://localhost:3000
+
+---
+
+## Notion Schema (Standard)
+
+### 1) Campaign Ledger Database
+
+Required properties (exact names):
+
+| Property Name | Type |
+| --- | --- |
+| Name | Title |
+| Track | Select |
+| Status | Select |
+| Approval Status | Select |
+| Created Date | Date |
+
+Recommended properties for Level 4–5:
+
+| Property Name | Type |
+| --- | --- |
+| Beehiiv Post ID | Rich text |
+| Subject Line | Rich text |
+| Send Date | Date |
+
+### 2) Clients Database
+
+Required properties (exact names):
+
+| Property Name | Type | Notes |
+| --- | --- | --- |
+| Name | Title | Human-readable client name |
+| Client ID | Rich text | Used for API requests |
+| Workspace ID | Rich text | Optional tenant identifier |
+| Brand Voice | Rich text | Brand voice notes for Claude |
+| Beehiiv API Key | Rich text | Client-owned API key |
+| Beehiiv Publication ID | Rich text | Client-owned publication ID |
+| Slack Webhook | URL | Channel webhook |
+| Cloudinary Cloud Name | Rich text | Optional |
+| Cloudinary API Key | Rich text | Optional |
+| Cloudinary API Secret | Rich text | Optional |
+| Ledger Database ID | Rich text | Optional override per client |
+| Briefs Database ID | Rich text | Optional override per client |
+| Performance Database ID | Rich text | Optional override per client |
+| Learning Database ID | Rich text | Optional override per client |
+
+### 3) Briefs Database (Optional)
+
+If you want Claude to store briefs separately, create a database with a standard
+Title property named `Name`, plus any fields you want to track.
+
+### 4) Performance Database (Required for Level 5)
+
+Required properties (exact names):
+
+| Property Name | Type |
+| --- | --- |
+| Name | Title |
+| Track | Select |
+| Channel | Select |
+| Beehiiv Post ID | Rich text |
+| Subject Line | Rich text |
+| Sends | Number |
+| Opens | Number |
+| Clicks | Number |
+| CTR | Number |
+| Unsubscribes | Number |
+| Sent At | Date |
+| Collected At | Date |
+| Ledger URL | URL |
+| Client ID | Rich text |
+| Workspace ID | Rich text |
+
+### 5) Learning Database (Required for Level 5)
+
+Required properties (exact names):
+
+| Property Name | Type |
+| --- | --- |
+| Name | Title |
+| Track | Select |
+| Summary | Rich text |
+| Evidence | Rich text |
+| Created Date | Date |
+| Applied | Checkbox |
+
+---
+
+## Environment Variables
+
+Create `.env.local`:
+
+```env
+# Claude API
+ANTHROPIC_API_KEY=sk-ant-v1-...
+
+# Notion
+NOTION_API_KEY=ntn_...
+NOTION_LEDGER_DATABASE_ID=abc123def456
+NOTION_CLIENTS_DATABASE_ID=xyz789abc
+NOTION_BRIEFS_DATABASE_ID=def456xyz
+NOTION_PERFORMANCE_DATABASE_ID=perf123xyz
+NOTION_LEARNING_DATABASE_ID=learn123xyz
+
+# Learning loop window (hours after send)
+LEARNING_ANALYSIS_WINDOW_HOURS=48
+
+# Optional quick links for the UI
+NEXT_PUBLIC_BRIEF_ENTRY_URL=https://www.notion.so/your-briefs-database
+NEXT_PUBLIC_LIGHT_DAM_URL=https://your-dam-url.example.com
+
+# Cloudinary (optional for now)
+CLOUDINARY_CLOUD_NAME=your_cloud
+CLOUDINARY_API_KEY=your_key
+CLOUDINARY_API_SECRET=your_secret
+
+# Beehiiv (optional for now)
+BEEHIIV_API_KEY=your_key
+BEEHIIV_PUBLICATION_ID=your_publication_id
+
+# Slack (optional)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+---
+
+## Vercel Deployment (Non-Technical)
+
+1. In Vercel, click **New Project**.
+2. Select this GitHub repo.
+3. In **Settings → General**, set **Root Directory** to:
+   ```
+   editorial-os
+   ```
+4. In **Settings → Environment Variables**, paste the same values from `.env.local`.
+5. Redeploy.
+
+---
+
+## Level 3 Newsletter: Non-Technical Checklist
+
+1. **Create the Notion databases** using the schema below.
+2. **Share those databases** with your Notion integration (Connections → invite the integration).
+3. **Add a client row** in the Clients database with:
+   - Client ID (you will type this in the UI)
+   - Brand Voice
+   - Beehiiv API Key + Publication ID
+   - Slack Webhook (optional)
+4. **Set the Vercel environment variables**.
+5. In the UI, enter the **Client ID** before sending your request.
+
+---
+
+## Level 4–5 (Scheduling + Learning Loops)
+
+1. Ensure every Newsletter entry has **Approval Status = Approved** before scheduling.
+2. The scheduler will block if approval is missing.
+3. Create the **Performance** and **Learning** databases above.
+4. Add these env vars in Vercel:
+   - `NOTION_PERFORMANCE_DATABASE_ID`
+   - `NOTION_LEARNING_DATABASE_ID`
+   - `LEARNING_ANALYSIS_WINDOW_HOURS` (default 48)
+5. Trigger the learning run:
+   - **Manual:** call `/api/cron/learning`
+   - **Automated:** configure a Vercel Cron to hit `/api/cron/learning` daily
+
+---
+
+## Multi-Tenancy
+
+Pass `clientId` or `workspaceId` in the API request body:
+
+```json
+{
+  "userMessage": "Create newsletter for this week...",
+  "clientId": "wander",
+  "trackId": 3
+}
+```
+
+The system will:
+1. Fetch the client config from the Notion Clients database.
+2. Inject the client brand voice into the Claude system prompt.
+3. Use client-specific Beehiiv/Slack credentials when running tools.
+
+---
+
+## How It Works
+
+1. User sends a request in the UI
+2. `/api/agents/newsletter` loads the agent spec + client context
+3. Claude calls tools
+4. Tool runtime executes side effects (Notion, Beehiiv, Slack)
+5. UI polls `/api/notion/ledger` every 5 seconds
+
+---
+
+## Testing Checklist
+
+- [ ] Claude can query Notion database
+- [ ] Claude can create pages in Campaign Ledger
+- [ ] UI fetches and displays ledger
+- [ ] Agent response shown to user
+- [ ] Tool calls logged to console
+- [ ] End-to-end: User message → Claude → Notion → UI
