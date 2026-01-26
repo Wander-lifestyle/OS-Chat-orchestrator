@@ -12,6 +12,8 @@ export interface ClientConfig {
   cloudinaryApiSecret?: string;
   ledgerDatabaseId?: string;
   briefsDatabaseId?: string;
+  performanceDatabaseId?: string;
+  learningDatabaseId?: string;
 }
 
 const notion = new Client({
@@ -47,6 +49,42 @@ function extractUrl(property: any): string | null {
   return property?.url || null;
 }
 
+function extractNumber(property: any): number | null {
+  if (!property) return null;
+  if (typeof property.number === 'number') return property.number;
+  return null;
+}
+
+function extractDate(property: any): string | null {
+  return property?.date?.start || null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function getBeehiivConfig(clientConfig?: ClientConfig) {
+  return {
+    apiKey: clientConfig?.beehiivApiKey || process.env.BEEHIIV_API_KEY,
+    publicationId:
+      clientConfig?.beehiivPublicationId || process.env.BEEHIIV_PUBLICATION_ID,
+  };
+}
+
+function getPerformanceDatabaseId(clientConfig?: ClientConfig) {
+  return (
+    clientConfig?.performanceDatabaseId || process.env.NOTION_PERFORMANCE_DATABASE_ID
+  );
+}
+
+function getLearningDatabaseId(clientConfig?: ClientConfig) {
+  return clientConfig?.learningDatabaseId || process.env.NOTION_LEARNING_DATABASE_ID;
+}
+
+function isApprovedStatus(status?: string | null) {
+  return Boolean(status && status.toLowerCase() === 'approved');
+}
+
 function toClientConfig(page: any): ClientConfig {
   return {
     clientId: extractPlainText(page.properties?.['Client ID']) || undefined,
@@ -66,6 +104,10 @@ function toClientConfig(page: any): ClientConfig {
       extractPlainText(page.properties?.['Ledger Database ID']) || undefined,
     briefsDatabaseId:
       extractPlainText(page.properties?.['Briefs Database ID']) || undefined,
+    performanceDatabaseId:
+      extractPlainText(page.properties?.['Performance Database ID']) || undefined,
+    learningDatabaseId:
+      extractPlainText(page.properties?.['Learning Database ID']) || undefined,
   };
 }
 
@@ -231,6 +273,224 @@ export async function updateNotionPage(
   }
 }
 
+export async function getLedgerApprovalStatus(pageId: string) {
+  if (!hasNotionConfig()) {
+    return { success: false, error: 'NOTION_API_KEY not configured' };
+  }
+
+  if (!pageId) {
+    return { success: false, error: 'pageId is required' };
+  }
+
+  try {
+    const page: any = await notion.pages.retrieve({ page_id: pageId });
+    const approvalStatus = extractSelectName(page?.properties?.['Approval Status']);
+    return { success: true, approvalStatus };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function hasPerformanceRecord(
+  beehiivPostId: string,
+  clientConfig?: ClientConfig
+) {
+  if (!hasNotionConfig()) {
+    return { success: false, error: 'NOTION_API_KEY not configured', exists: false };
+  }
+
+  const databaseId = getPerformanceDatabaseId(clientConfig);
+  if (!databaseId) {
+    return { success: false, error: 'NOTION_PERFORMANCE_DATABASE_ID not configured', exists: false };
+  }
+
+  if (!beehiivPostId) {
+    return { success: false, error: 'beehiivPostId is required', exists: false };
+  }
+
+  try {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        property: 'Beehiiv Post ID',
+        rich_text: { equals: beehiivPostId },
+      },
+      page_size: 1,
+    });
+
+    return { success: true, exists: (response.results || []).length > 0 };
+  } catch (error: any) {
+    return { success: false, error: error.message, exists: false };
+  }
+}
+
+export async function getRecentPerformanceMetrics(
+  track?: string,
+  clientConfig?: ClientConfig,
+  limit: number = 10
+) {
+  if (!hasNotionConfig()) {
+    return { success: false, error: 'NOTION_API_KEY not configured', metrics: [] };
+  }
+
+  const databaseId = getPerformanceDatabaseId(clientConfig);
+  if (!databaseId) {
+    return {
+      success: false,
+      error: 'NOTION_PERFORMANCE_DATABASE_ID not configured',
+      metrics: [],
+    };
+  }
+
+  try {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      filter: track
+        ? {
+            property: 'Track',
+            select: { equals: track },
+          }
+        : undefined,
+      sorts: [
+        {
+          property: 'Collected At',
+          direction: 'descending',
+        },
+      ],
+      page_size: Math.min(limit, 25),
+    });
+
+    const metrics = (response.results || []).map((page: any) => ({
+      subjectLine: extractPlainText(page.properties?.['Subject Line']) || undefined,
+      sends: extractNumber(page.properties?.Sends) ?? undefined,
+      opens: extractNumber(page.properties?.Opens) ?? undefined,
+      clicks: extractNumber(page.properties?.Clicks) ?? undefined,
+      ctr: extractNumber(page.properties?.CTR) ?? undefined,
+      unsubscribes: extractNumber(page.properties?.Unsubscribes) ?? undefined,
+      sentAt: extractDate(page.properties?.['Sent At']) || undefined,
+      collectedAt: extractDate(page.properties?.['Collected At']) || undefined,
+    }));
+
+    return { success: true, metrics };
+  } catch (error: any) {
+    return { success: false, error: error.message, metrics: [] };
+  }
+}
+
+export async function storePerformanceMetrics(
+  input: {
+    track?: string;
+    channel: string;
+    beehiivPostId?: string;
+    subjectLine?: string;
+    sends?: number;
+    opens?: number;
+    clicks?: number;
+    ctr?: number;
+    unsubscribes?: number;
+    sentAt?: string;
+    ledgerUrl?: string;
+    clientId?: string;
+    workspaceId?: string;
+  },
+  clientConfig?: ClientConfig
+) {
+  if (!hasNotionConfig()) {
+    return { success: false, error: 'NOTION_API_KEY not configured' };
+  }
+
+  const databaseId = getPerformanceDatabaseId(clientConfig);
+  if (!databaseId) {
+    return { success: false, error: 'NOTION_PERFORMANCE_DATABASE_ID not configured' };
+  }
+
+  const title = input.subjectLine || input.beehiivPostId || 'Performance Entry';
+
+  const properties: Record<string, any> = {
+    Name: { title: [{ text: { content: title } }] },
+    Channel: { select: { name: input.channel } },
+    'Collected At': { date: { start: new Date().toISOString() } },
+  };
+
+  if (input.track) {
+    properties.Track = { select: { name: input.track } };
+  }
+  if (input.beehiivPostId) {
+    properties['Beehiiv Post ID'] = {
+      rich_text: [{ text: { content: input.beehiivPostId } }],
+    };
+  }
+  if (input.subjectLine) {
+    properties['Subject Line'] = {
+      rich_text: [{ text: { content: input.subjectLine } }],
+    };
+  }
+  if (isFiniteNumber(input.sends)) {
+    properties.Sends = { number: input.sends };
+  }
+  if (isFiniteNumber(input.opens)) {
+    properties.Opens = { number: input.opens };
+  }
+  if (isFiniteNumber(input.clicks)) {
+    properties.Clicks = { number: input.clicks };
+  }
+  if (isFiniteNumber(input.ctr)) {
+    properties.CTR = { number: input.ctr };
+  }
+  if (isFiniteNumber(input.unsubscribes)) {
+    properties.Unsubscribes = { number: input.unsubscribes };
+  }
+  if (input.sentAt) {
+    properties['Sent At'] = { date: { start: input.sentAt } };
+  }
+  if (input.ledgerUrl) {
+    properties['Ledger URL'] = { url: input.ledgerUrl };
+  }
+  if (input.clientId) {
+    properties['Client ID'] = { rich_text: [{ text: { content: input.clientId } }] };
+  }
+  if (input.workspaceId) {
+    properties['Workspace ID'] = { rich_text: [{ text: { content: input.workspaceId } }] };
+  }
+
+  return createNotionPage(databaseId, properties);
+}
+
+export async function storeLearningPattern(
+  input: {
+    track?: string;
+    summary: string;
+    evidence?: string;
+    applied?: boolean;
+  },
+  clientConfig?: ClientConfig
+) {
+  if (!hasNotionConfig()) {
+    return { success: false, error: 'NOTION_API_KEY not configured' };
+  }
+
+  const databaseId = getLearningDatabaseId(clientConfig);
+  if (!databaseId) {
+    return { success: false, error: 'NOTION_LEARNING_DATABASE_ID not configured' };
+  }
+
+  const properties: Record<string, any> = {
+    Name: { title: [{ text: { content: 'Learning' } }] },
+    Summary: { rich_text: [{ text: { content: input.summary } }] },
+    'Created Date': { date: { start: new Date().toISOString() } },
+    Applied: { checkbox: Boolean(input.applied) },
+  };
+
+  if (input.track) {
+    properties.Track = { select: { name: input.track } };
+  }
+  if (input.evidence) {
+    properties.Evidence = { rich_text: [{ text: { content: input.evidence } }] };
+  }
+
+  return createNotionPage(databaseId, properties);
+}
+
 export async function getCampaignLedger(trackId?: string, clientConfig?: ClientConfig) {
   if (!hasNotionConfig()) {
     return { success: false, error: 'NOTION_API_KEY not configured' };
@@ -328,17 +588,38 @@ export async function scheduleBeehiivNewsletter(
   subject: string,
   htmlContent: string,
   sendTime: string,
-  clientConfig?: ClientConfig
+  clientConfig?: ClientConfig,
+  ledgerPageId?: string
 ) {
   try {
-    const apiKey = clientConfig?.beehiivApiKey || process.env.BEEHIIV_API_KEY;
-    const publicationId =
-      clientConfig?.beehiivPublicationId || process.env.BEEHIIV_PUBLICATION_ID;
+    const { apiKey, publicationId } = getBeehiivConfig(clientConfig);
 
     if (!apiKey || !publicationId) {
       return {
         success: false,
         error: 'Beehiiv is not configured for this client',
+      };
+    }
+
+    if (!ledgerPageId) {
+      return {
+        success: false,
+        error: 'ledger_page_id is required to enforce approval before scheduling',
+      };
+    }
+
+    const approvalResult = await getLedgerApprovalStatus(ledgerPageId);
+    if (!approvalResult.success) {
+      return {
+        success: false,
+        error: approvalResult.error || 'Unable to verify approval status',
+      };
+    }
+
+    if (!isApprovedStatus(approvalResult.approvalStatus)) {
+      return {
+        success: false,
+        error: 'Approval required. Set Approval Status to Approved in Notion.',
       };
     }
 
@@ -368,18 +649,179 @@ export async function scheduleBeehiivNewsletter(
     }
 
     const data = await response.json();
+    const postId = data?.data?.id || publicationId;
+    const postUrl = data?.data?.url || data?.data?.web_url || '';
+
+    const ledgerUpdate = await updateNotionPage(ledgerPageId, {
+      'Beehiiv Post ID': {
+        rich_text: [{ text: { content: postId } }],
+      },
+      'Subject Line': {
+        rich_text: [{ text: { content: subject } }],
+      },
+      'Send Date': {
+        date: { start: sendTime },
+      },
+      Status: {
+        select: { name: 'Scheduled' },
+      },
+    });
 
     return {
       success: true,
-      publicationId: data?.data?.id || publicationId,
-      url: data?.data?.url || data?.data?.web_url || '',
+      publicationId: postId,
+      url: postUrl,
       scheduledFor: sendTime,
+      ledgerUpdated: ledgerUpdate.success,
+      ledgerUpdateError: ledgerUpdate.success ? undefined : ledgerUpdate.error,
     };
   } catch (error: any) {
     return {
       success: false,
       error: error.message,
     };
+  }
+}
+
+function normalizeMetric(value: any): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function extractBeehiivStats(payload: any) {
+  const stats =
+    payload?.stats ||
+    payload?.post_stats ||
+    payload?.metrics ||
+    payload?.data?.stats ||
+    payload?.data?.post_stats ||
+    payload?.data?.metrics ||
+    {};
+
+  return {
+    sends: normalizeMetric(stats?.sent || stats?.sends),
+    opens: normalizeMetric(stats?.opens || stats?.unique_opens),
+    clicks: normalizeMetric(stats?.clicks || stats?.unique_clicks),
+    ctr: normalizeMetric(stats?.ctr || stats?.click_through_rate),
+    unsubscribes: normalizeMetric(stats?.unsubscribes || stats?.unsubscribed),
+  };
+}
+
+export async function listBeehiivPosts(
+  limit: number = 10,
+  clientConfig?: ClientConfig
+) {
+  try {
+    const { apiKey, publicationId } = getBeehiivConfig(clientConfig);
+    if (!apiKey || !publicationId) {
+      return { success: false, error: 'Beehiiv is not configured', posts: [] };
+    }
+
+    const response = await fetch(
+      `https://api.beehiiv.com/v2/publications/${publicationId}/posts?limit=${limit}`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `Beehiiv API error ${response.status}: ${errorText}`,
+        posts: [],
+      };
+    }
+
+    const payload = await response.json();
+    const posts = (payload?.data || []).map((post: any) => ({
+      id: post?.id,
+      title: post?.title || post?.subject || post?.name,
+      status: post?.status,
+      url: post?.url || post?.web_url,
+      sentAt:
+        post?.published_at ||
+        post?.send_at ||
+        post?.scheduled_at ||
+        post?.created_at,
+      stats: extractBeehiivStats(post),
+    }));
+
+    return { success: true, posts };
+  } catch (error: any) {
+    return { success: false, error: error.message, posts: [] };
+  }
+}
+
+export async function fetchBeehiivPostMetrics(
+  postId: string,
+  clientConfig?: ClientConfig
+) {
+  try {
+    const { apiKey, publicationId } = getBeehiivConfig(clientConfig);
+    if (!apiKey || !publicationId) {
+      return { success: false, error: 'Beehiiv is not configured' };
+    }
+
+    if (!postId) {
+      return { success: false, error: 'postId is required' };
+    }
+
+    const response = await fetch(
+      `https://api.beehiiv.com/v2/publications/${publicationId}/posts/${postId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `Beehiiv API error ${response.status}: ${errorText}`,
+      };
+    }
+
+    const payload = await response.json();
+    const stats = extractBeehiivStats(payload);
+    const post = payload?.data || {};
+
+    const sends = stats.sends;
+    const opens = stats.opens;
+    const clicks = stats.clicks;
+    const ctr =
+      stats.ctr ?? (isFiniteNumber(sends) && sends > 0 ? (clicks || 0) / sends : undefined);
+
+    return {
+      success: true,
+      metrics: {
+        postId,
+        subjectLine: post?.title || post?.subject || post?.name,
+        sends,
+        opens,
+        clicks,
+        ctr,
+        unsubscribes: stats.unsubscribes,
+        sentAt:
+          post?.published_at ||
+          post?.send_at ||
+          post?.scheduled_at ||
+          post?.created_at,
+        url: post?.url || post?.web_url,
+      },
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
 

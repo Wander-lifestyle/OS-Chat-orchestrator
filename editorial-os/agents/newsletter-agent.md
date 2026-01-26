@@ -21,3 +21,5 @@ You have access to these tools:
 4. Return the Notion page URL to the user.
 5. Use the Ledger Database ID provided in Runtime Context.
 6. Use the Briefs Database ID provided in Runtime Context.
+7. When scheduling, always pass the Ledger page ID as ledger_page_id.
+8. If approval is missing, return a draft and ask for approval.

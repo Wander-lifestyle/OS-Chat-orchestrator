@@ -43,6 +43,14 @@ Required properties (exact names):
 | Approval Status | Select |
 | Created Date | Date |
 
+Recommended properties for Level 4–5:
+
+| Property Name | Type |
+| --- | --- |
+| Beehiiv Post ID | Rich text |
+| Subject Line | Rich text |
+| Send Date | Date |
+
 ### 2) Clients Database
 
 Required properties (exact names):
@@ -61,11 +69,48 @@ Required properties (exact names):
 | Cloudinary API Secret | Rich text | Optional |
 | Ledger Database ID | Rich text | Optional override per client |
 | Briefs Database ID | Rich text | Optional override per client |
+| Performance Database ID | Rich text | Optional override per client |
+| Learning Database ID | Rich text | Optional override per client |
 
 ### 3) Briefs Database (Optional)
 
 If you want Claude to store briefs separately, create a database with a standard
 Title property named `Name`, plus any fields you want to track.
+
+### 4) Performance Database (Required for Level 5)
+
+Required properties (exact names):
+
+| Property Name | Type |
+| --- | --- |
+| Name | Title |
+| Track | Select |
+| Channel | Select |
+| Beehiiv Post ID | Rich text |
+| Subject Line | Rich text |
+| Sends | Number |
+| Opens | Number |
+| Clicks | Number |
+| CTR | Number |
+| Unsubscribes | Number |
+| Sent At | Date |
+| Collected At | Date |
+| Ledger URL | URL |
+| Client ID | Rich text |
+| Workspace ID | Rich text |
+
+### 5) Learning Database (Required for Level 5)
+
+Required properties (exact names):
+
+| Property Name | Type |
+| --- | --- |
+| Name | Title |
+| Track | Select |
+| Summary | Rich text |
+| Evidence | Rich text |
+| Created Date | Date |
+| Applied | Checkbox |
 
 ---
 
@@ -82,6 +127,11 @@ NOTION_API_KEY=ntn_...
 NOTION_LEDGER_DATABASE_ID=abc123def456
 NOTION_CLIENTS_DATABASE_ID=xyz789abc
 NOTION_BRIEFS_DATABASE_ID=def456xyz
+NOTION_PERFORMANCE_DATABASE_ID=perf123xyz
+NOTION_LEARNING_DATABASE_ID=learn123xyz
+
+# Learning loop window (hours after send)
+LEARNING_ANALYSIS_WINDOW_HOURS=48
 
 # Optional quick links for the UI
 NEXT_PUBLIC_BRIEF_ENTRY_URL=https://www.notion.so/your-briefs-database
@@ -126,6 +176,21 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
    - Slack Webhook (optional)
 4. **Set the Vercel environment variables**.
 5. In the UI, enter the **Client ID** before sending your request.
+
+---
+
+## Level 4–5 (Scheduling + Learning Loops)
+
+1. Ensure every Newsletter entry has **Approval Status = Approved** before scheduling.
+2. The scheduler will block if approval is missing.
+3. Create the **Performance** and **Learning** databases above.
+4. Add these env vars in Vercel:
+   - `NOTION_PERFORMANCE_DATABASE_ID`
+   - `NOTION_LEARNING_DATABASE_ID`
+   - `LEARNING_ANALYSIS_WINDOW_HOURS` (default 48)
+5. Trigger the learning run:
+   - **Manual:** call `/api/cron/learning`
+   - **Automated:** configure a Vercel Cron to hit `/api/cron/learning` daily
 
 ---
 

@@ -108,8 +108,13 @@ export const tools: Anthropic.Tool[] = [
           type: 'string',
           description: 'ISO 8601 datetime when to send (e.g., 2026-01-24T08:00:00Z)',
         },
+        ledger_page_id: {
+          type: 'string',
+          description:
+            'Notion page ID for the Campaign Ledger entry (required for approval gating).',
+        },
       },
-      required: ['subject', 'html_content', 'send_time'],
+      required: ['subject', 'html_content', 'send_time', 'ledger_page_id'],
     },
   },
   {
@@ -171,7 +176,8 @@ export async function executeTool(
           toolInput.subject,
           toolInput.html_content,
           toolInput.send_time,
-          clientConfig
+          clientConfig,
+          toolInput.ledger_page_id
         );
         break;
       case 'post_slack':
