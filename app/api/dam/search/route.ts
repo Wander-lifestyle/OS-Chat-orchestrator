@@ -339,7 +339,7 @@ async function runSearch(request: NextRequest) {
       const embeddings = await createEmbeddings([query]);
       const embedding = embeddings[0];
       const supabase = getSupabaseAdmin();
-      const { data, error } = await supabase.rpc('match_asset_embeddings', {
+      const { data, error } = await (supabase as any).rpc('match_asset_embeddings', {
         query_embedding: embedding,
         match_count: limit,
         org_id: orgId,
