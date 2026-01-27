@@ -1,29 +1,20 @@
-# Editorial OS
+# Light DAM
 
-AI-first operating system for content and communications. One chat, all tools.
+Light DAM is a lightweight digital asset manager designed for small marketing teams
+who need a fast, searchable library of images (20-50 assets, not thousands). It uses
+Cloudinary as the single source of truth for storage, metadata, previews, and download
+links.
 
-## The Vision
+## Features
 
-```
-┌─────────────────────────────────────────────────┐
-│  ◈ Editorial OS                                 │
-├─────────────────────────────────────────────────┤
-│  [ Brief Engine ]  [ Campaign Deck ]  [ DAM ]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │ "Create a brief for EU eSIM launch..."   │  │
-│  └───────────────────────────────────────────┘  │
-│                                    [Send ✨]    │
-│                                                 │
-│  🤖 Editorial OS:                              │
-│  ✓ Brief created                               │
-│  ✓ Added to Campaign Deck (status: intake)     │
-│  ✓ Slack notified                              │
-│                                                 │
-│  [View Brief] [View in Deck] [Search DAM]      │
-└─────────────────────────────────────────────────┘
-```
+- Natural language search over tags, metadata, and filenames
+- Image previews and one-click downloads
+- Metadata-driven organization (photographer, usage rights, campaign, asset number)
+- Upload UI with metadata form (asset #, campaign, photographer, usage rights)
+- Optional AI auto-tagging and AI search mode
+- Drag-and-drop + multi-upload support
+- AI tag confidence display (when returned by Cloudinary)
+- Optional folder scoping for multi-team libraries
 
 ## Quick Start
 
@@ -31,164 +22,188 @@ AI-first operating system for content and communications. One chat, all tools.
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.example .env.local
-
-# Start development server
+# Start dev server
 npm run dev
 ```
 
 ## Environment Variables
 
-**Required**: Set these in Vercel or your `.env.local`:
+Create a `.env.local` file or configure these in Vercel:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
-| `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | Yes |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | Yes |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | Yes |
+| `CLOUDINARY_FOLDER` | Optional folder scope for assets | No |
+| `CLOUDINARY_AUTO_TAGGING_THRESHOLD` | Auto-tagging confidence (0.1-0.95) | No |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key | Yes (Milestone 1) |
+| `CLERK_SECRET_KEY` | Clerk secret key | Yes (Milestone 1) |
+| `NEXT_PUBLIC_GA_ID` | Google Analytics measurement ID | No |
+| `SUPABASE_URL` | Supabase project URL | Yes (Milestone 2) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes (Milestone 2) |
+| `SUPABASE_ANON_KEY` | Supabase publishable key | No |
+| `LIGHT_DAM_ASSET_LIMIT` | Max assets per workspace | No (default: 50) |
+| `STRIPE_SECRET_KEY` | Stripe secret key | Yes (Milestone 5) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Yes (Milestone 5) |
+| `STRIPE_PRICE_MONTHLY_ID` | Stripe monthly price ID | Yes (Milestone 5) |
+| `STRIPE_PRICE_YEARLY_ID` | Stripe yearly price ID | Optional |
+| `STRIPE_COUPON_YEARLY_ID` | Stripe coupon for yearly discount | Optional |
+| `STRIPE_TRIAL_DAYS` | Trial length in days | Optional (default 7) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | Yes (Milestone 5) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL | Optional |
+| `OPENAI_API_KEY` | OpenAI API key | Yes (AI magic) |
+| `OPENAI_EMBEDDING_MODEL` | Embedding model | No (default text-embedding-3-small) |
 
-## Deploy to Vercel
+## Authentication (Milestone 1)
 
-### Option 1: Via GitHub
+Light DAM uses Clerk for authentication and organizations. Create a Clerk app, then set:
 
-1. Push this repo to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/new)
-3. Set environment variables in Project Settings → Environment Variables
-4. Deploy
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
 
-### Option 2: Via CLI
+Marketing page stays public at `/marketing`.
 
-```bash
-# Install Vercel CLI
-npm i -g vercel
+## Supabase setup (Milestone 2)
 
-# Login
-vercel login
+Create a `organization_cloudinary` table for BYOC credentials:
 
-# Preview deploy (staging)
-vercel
-
-# Production deploy
-vercel --prod
+```sql
+create table if not exists organization_cloudinary (
+  org_id text primary key,
+  cloud_name text not null,
+  api_key text not null,
+  api_secret text not null,
+  folder text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 ```
 
-### Setting Environment Variables in Vercel
+Create an `audit_logs` table for activity tracking:
 
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
-   - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
+```sql
+create table if not exists audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  org_id text not null,
+  user_id text not null,
+  action text not null,
+  details jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create index if not exists audit_logs_org_id_idx on audit_logs (org_id);
+create index if not exists audit_logs_created_at_idx on audit_logs (created_at desc);
+```
+
+> Note: credentials are stored in Supabase and accessed via the service role key.
+
+## AI search (Milestone 6)
+
+Enable the vector extension and create the embeddings table:
+
+```sql
+create extension if not exists vector;
+
+create table if not exists asset_embeddings (
+  org_id text not null,
+  public_id text not null,
+  content text,
+  embedding vector(1536),
+  updated_at timestamptz default now(),
+  primary key (org_id, public_id)
+);
+
+create index if not exists asset_embeddings_org_id_idx on asset_embeddings (org_id);
+create index if not exists asset_embeddings_embedding_idx on asset_embeddings using ivfflat (embedding vector_cosine_ops);
+
+create or replace function match_asset_embeddings(
+  query_embedding vector(1536),
+  match_count int,
+  org_id text
+)
+returns table(public_id text, similarity float)
+language sql stable
+as $$
+  select public_id,
+         1 - (embedding <=> query_embedding) as similarity
+  from asset_embeddings
+  where asset_embeddings.org_id = match_asset_embeddings.org_id
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+Visit `/settings/cloudinary` and click **Build AI index** to embed existing assets.
+
+Create an `organization_billing` table for Stripe:
+
+```sql
+create table if not exists organization_billing (
+  org_id text primary key,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  status text,
+  price_id text,
+  current_period_end timestamptz,
+  trial_end timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
+
+## Usage limits (Milestone 3)
+
+Set `LIGHT_DAM_ASSET_LIMIT` to cap total assets per workspace. Defaults to 50.
+
+## Audit logs (Milestone 4)
+
+Activity is recorded for search, uploads, downloads, and settings updates.
+Visit `/audit` to view the latest events.
 
 ## How It Works
 
-1. **You type** a natural language request
-2. **Router** determines which module handles it (Brief, Deck, DAM)
-3. **Executor** calls the appropriate API with timeout handling
-4. **Results** displayed with action buttons
+1. The UI calls `GET /api/dam/search?q=...`
+2. The API queries Cloudinary for the latest assets
+3. Results are filtered by the search query (tags, metadata, filenames, IDs)
+4. The UI renders previews and download links
+5. Uploads go directly to Cloudinary using a signed upload signature (supports larger files).
 
-## Connected Modules
+## Metadata Conventions
 
-| Module | Purpose | URL |
-|--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
-| Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
+Light DAM reads metadata from either Cloudinary **context** or **structured metadata**.
+Populate any of these fields to power searching and UI labels:
 
-## Example Queries
+- `asset_id` (for image number searches)
+- `photographer`
+- `usage_rights`
+- `campaign`
+- `description` / `caption`
 
-**Creating briefs:**
-- "Create a brief for EU eSIM launch"
-- "New campaign for Q1 brand awareness targeting millennials"
-- "Make a brief called Holiday Sale for email and Instagram"
+### Example: Uploading with Context
 
-**Checking campaigns:**
-- "Show me active campaigns"
-- "What's the status of the EU launch?"
-- "List all projects"
-
-**Finding assets:**
-- "Find hero images for Instagram"
-- "Search for travel photos"
-- "I need visuals for the EU campaign"
-
-## Architecture
-
-```
-User Query
-    ↓
-Editorial OS (API Route)
-    ↓
-Router (with 5s timeout)
-    ↓
-┌───────────┬───────────┬───────────┐
-│  Brief    │  Campaign │   Light   │
-│  Engine   │   Deck    │    DAM    │
-└───────────┴───────────┴───────────┘
-    ↓
-Results + Actions
+```bash
+curl -X POST \
+  -F file=@hero.jpg \
+  -F upload_preset=your_preset \
+  -F context="asset_id=1234|photographer=Alex Rivera|usage_rights=Global paid social|campaign=Spring Launch" \
+  "https://api.cloudinary.com/v1_1/<cloud-name>/image/upload"
 ```
 
-## The Flow
+## Search Tips
 
-```
-"Create a brief for EU eSIM launch"
-    ↓
-API Route: POST /api/chat
-    ↓
-Router: module=brief, intent=create
-    ↓
-POST brief-engine.vercel.app/api/brief/create (5s timeout)
-    ↓
-Brief Engine: Creates brief + POSTs to Campaign Deck
-    ↓
-Campaign Deck: Creates ledger entry (intake)
-    ↓
-Editorial OS: "✓ Brief created. ✓ Added to Deck."
-    ↓
-Action buttons: [View Brief] [View in Deck]
-```
+- Search by image number: `image #1234`
+- Search by photographer: `photographer Alex`
+- Search by campaign name or tag: `spring launch`
+- Toggle **AI search** for broader semantic matches (uses tags + metadata)
 
-## Project Structure
+> Note: AI auto-tagging requires the Cloudinary Auto-Tagging add-on.
 
-```
-editorial-os/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # API endpoint for chat
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main chat interface
-├── components/
-│   ├── ChatInput.tsx         # Message input component
-│   ├── ChatMessage.tsx       # Message display component
-│   ├── ErrorBoundary.tsx     # Error handling wrapper
-│   └── ModuleTabs.tsx        # Module navigation tabs
-├── lib/
-│   ├── router.ts             # Query routing logic
-│   └── types.ts              # TypeScript types
-├── .env.example              # Environment variables template
-├── .gitignore
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-└── tsconfig.json
-```
+## Deployment
 
-## This is the Product
-
-Not individual tools. One unified interface.
-
-- **Solopreneur**: "Create a brief for my launch" → Done
-- **Marketing team**: "Show active campaigns" → Dashboard
-- **Agency**: "Find assets for client X" → Results
-
-All from one chat box.
-
----
-
-Part of Editorial OS. Built for content operations at any scale.
+Deploy to Vercel as a standard Next.js app. Add the Cloudinary environment variables
+in Project Settings.
