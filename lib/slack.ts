@@ -1,6 +1,7 @@
 export type SlackNotificationInput = {
   channel: string;
   message: string;
+  threadTs?: string;
 };
 
 import { fetchWithTimeout } from '@/lib/http';
@@ -32,6 +33,7 @@ export async function postNotification(
       body: JSON.stringify({
         channel: input.channel,
         text: input.message,
+        thread_ts: input.threadTs,
       }),
     }
   );

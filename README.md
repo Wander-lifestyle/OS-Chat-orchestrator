@@ -64,6 +64,29 @@ curl -X POST http://localhost:3000/api/run-editorial-os \
   -d '{"message":"Draft a newsletter intro","agentLevel":3,"os":"newsletter"}'
 ```
 
+### POST /api/slack/events
+
+Slack Events API endpoint for @mention support. Configure your Slack app
+to point its Request URL here. The handler verifies Slack signatures and
+responds in the same channel/thread.
+
+## Slack Setup (App Mention)
+
+1. Create a Slack app in your workspace.
+2. Enable **Event Subscriptions** and set the Request URL to:
+   `https://<your-domain>/api/slack/events`
+3. Subscribe to the **app_mention** event.
+4. Add OAuth scopes:
+   - `chat:write`
+   - `app_mentions:read`
+5. Install the app to your workspace and invite it to the target channel.
+6. Set env vars:
+   - `SLACK_BOT_TOKEN`
+   - `SLACK_SIGNING_SECRET`
+   - `SLACK_DEFAULT_CHANNEL` (optional)
+   - `SLACK_DEFAULT_AGENT_LEVEL` (optional)
+   - `SLACK_DEFAULT_OS` (optional)
+
 ## Configuration
 
 The bridge uses Anthropic directly. Agent prompts live in `/agents` and
@@ -85,6 +108,10 @@ Environment variables:
 - `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`, `BEEHIIV_API_BASE_URL`
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 - `SLACK_BOT_TOKEN`
+- `SLACK_SIGNING_SECRET`
+- `SLACK_DEFAULT_CHANNEL`
+- `SLACK_DEFAULT_AGENT_LEVEL`
+- `SLACK_DEFAULT_OS`
 
 ## Agent Prompts
 
