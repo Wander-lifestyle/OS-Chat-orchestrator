@@ -75,3 +75,15 @@ export async function getAssetCount(settings: CloudinarySettings, maxResults: nu
   }
   return Array.isArray(result.resources) ? result.resources.length : 0;
 }
+
+export async function getAssetsByIds(publicIds: string[]) {
+  if (publicIds.length === 0) return [];
+  const result = await cloudinary.api.resources_by_ids(publicIds, {
+    resource_type: 'image',
+    type: 'upload',
+    context: true,
+    metadata: true,
+    tags: true,
+  });
+  return result.resources ?? [];
+}

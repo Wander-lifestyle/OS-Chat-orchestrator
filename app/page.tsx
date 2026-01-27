@@ -32,6 +32,7 @@ type DamSearchResponse = {
   next_cursor: string | null;
   error?: string;
   missing?: string[];
+  ai_fallback?: boolean;
 };
 
 type UploadSignatureResponse = {
@@ -52,6 +53,15 @@ type CloudinaryUploadResult = {
   secure_url?: string;
   tags?: string[] | string;
   error?: { message?: string };
+};
+
+type Variant = {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+  preview_url: string;
+  download_url: string;
 };
 
 type UsageSummary = {
@@ -133,6 +143,7 @@ export default function LightDamPage() {
   const [uploadErrors, setUploadErrors] = useState<Array<{ fileName: string; error: string }>>([]);
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [variantState, setVariantState] = useState<Record<string, { loading: boolean; variants: Variant[]; error?: string }>>({});
   const [uploadFields, setUploadFields] = useState({
     assetNumber: '',
     photographer: '',
@@ -393,6 +404,21 @@ export default function LightDamPage() {
         setUploadMessage(`Uploaded ${uploaded} asset${uploaded === 1 ? '' : 's'}.${failed ? ` ${failed} failed.` : ''}`);
         void fetchUsage();
         void fetchBilling();
+
+        const publicIds = uploadedAssets
+          .map((asset) => asset.public_id)
+          .filter((value): value is string => Boolean(value));
+        if (publicIds.length > 0) {
+          try {
+            await fetch('/api/ai/index', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicIds }),
+            });
+          } catch (error) {
+            console.error('AI indexing failed:', error);
+          }
+        }
       } else {
         setUploadStatus('error');
         setUploadMessage(errors[0]?.error || 'Upload failed. Please check file size and try again.');
@@ -454,6 +480,34 @@ export default function LightDamPage() {
   const limitReached = usage ? usage.used >= usage.limit : false;
   const billingActive = billing?.active ?? false;
   const billingReady = billingStatus !== 'loading';
+
+  const generateVariants = useCallback(async (publicId: string) => {
+    setVariantState((prev) => ({
+      ...prev,
+      [publicId]: { loading: true, variants: [], error: undefined },
+    }));
+    try {
+      const response = await fetch(`/api/dam/variants?public_id=${encodeURIComponent(publicId)}`);
+      const data = await response.json();
+      if (!response.ok) {
+        setVariantState((prev) => ({
+          ...prev,
+          [publicId]: { loading: false, variants: [], error: data.error || 'Unable to load variants.' },
+        }));
+        return;
+      }
+      setVariantState((prev) => ({
+        ...prev,
+        [publicId]: { loading: false, variants: data.variants || [], error: undefined },
+      }));
+    } catch (error) {
+      console.error('Variant fetch failed:', error);
+      setVariantState((prev) => ({
+        ...prev,
+        [publicId]: { loading: false, variants: [], error: 'Unable to load variants.' },
+      }));
+    }
+  }, []);
 
   const errorTitle = useMemo(() => {
     if (!error) return '';
@@ -598,6 +652,17 @@ export default function LightDamPage() {
                 Create workspace
               </a>
             )}
+          </div>
+        )}
+
+        {results.ai_fallback && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-700 shadow-sm">
+            AI search index is not ready yet. Showing keyword results instead.
+            <div className="mt-2">
+              <a href="/settings/cloudinary" className="text-xs font-semibold underline">
+                Build AI index
+              </a>
+            </div>
           </div>
         )}
 
@@ -981,7 +1046,50 @@ export default function LightDamPage() {
                       >
                         Download
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => generateVariants(asset.public_id)}
+                        className="rounded-lg border border-black/10 bg-white px-3 py-2 text-os-text shadow-sm transition hover:bg-os-bg"
+                      >
+                        AI variants
+                      </button>
                     </div>
+
+                    {variantState[asset.public_id]?.loading && (
+                      <p className="text-xs text-os-muted">Generating variants...</p>
+                    )}
+                    {variantState[asset.public_id]?.error && (
+                      <p className="text-xs text-red-600">{variantState[asset.public_id]?.error}</p>
+                    )}
+                    {variantState[asset.public_id]?.variants.length > 0 && (
+                      <div className="grid gap-3 pt-2">
+                        {variantState[asset.public_id]?.variants.map((variant) => (
+                          <div
+                            key={variant.id}
+                            className="flex flex-col gap-2 rounded-2xl border border-black/10 bg-white p-3 text-xs text-os-muted"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-os-text">{variant.label}</span>
+                              <span>
+                                {variant.width}x{variant.height}
+                              </span>
+                            </div>
+                            <img
+                              src={variant.preview_url}
+                              alt={variant.label}
+                              className="h-40 w-full rounded-xl object-cover"
+                              loading="lazy"
+                            />
+                            <a
+                              href={variant.download_url}
+                              className="inline-flex items-center justify-center rounded-lg bg-os-accent px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-600"
+                            >
+                              Download variant
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </article>
               );

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
 import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
-import { getVariantPresetById } from '@/lib/variants';
 import { logAuditEvent } from '@/lib/audit';
+import { VARIANT_PRESETS } from '@/lib/variants';
 
 export async function GET(request: NextRequest) {
   const { userId, orgId } = await auth();
@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
   }
 
   const publicId = request.nextUrl.searchParams.get('public_id');
-  const presetId = request.nextUrl.searchParams.get('preset');
   if (!publicId) {
     return NextResponse.json({ error: 'public_id is required.' }, { status: 400 });
   }
@@ -33,26 +32,30 @@ export async function GET(request: NextRequest) {
 
   configureCloudinary(settings);
 
-  const preset = presetId ? getVariantPresetById(presetId) : null;
-
-  const downloadUrl = cloudinary.url(publicId, {
-    secure: true,
-    resource_type: 'image',
-    type: 'upload',
-    flags: 'attachment',
-    transformation: preset?.transformation,
-  });
+  const variants = VARIANT_PRESETS.map((preset) => ({
+    id: preset.id,
+    label: preset.label,
+    width: preset.width,
+    height: preset.height,
+    preview_url: cloudinary.url(publicId, {
+      secure: true,
+      resource_type: 'image',
+      type: 'upload',
+      transformation: preset.transformation,
+    }),
+    download_url: `/api/dam/download?public_id=${encodeURIComponent(publicId)}&preset=${preset.id}`,
+  }));
 
   try {
     await logAuditEvent({
       orgId,
       userId,
-      action: 'download',
-      details: { publicId, preset: presetId ?? null },
+      action: 'variant_generated',
+      details: { publicId, presets: VARIANT_PRESETS.map((preset) => preset.id) },
     });
   } catch (error) {
     console.error('Audit log error:', error);
   }
 
-  return NextResponse.redirect(downloadUrl);
+  return NextResponse.json({ variants });
 }

@@ -47,10 +47,10 @@ export default function MarketingPage() {
               <div className="space-y-6">
                 <p className="text-xs uppercase tracking-[0.3em] text-os-muted">Light DAM</p>
                 <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-                  A simple, fast DAM for small teams
+                  An AI-native DAM for small teams
                 </h1>
                 <p className="text-base text-os-muted">
-                  Organize 20 to 50 images, track usage rights, and find assets in seconds.
+                  Ask the DAM, generate campaign-ready crops, and keep metadata clean.
                   Built for marketing teams, agencies, solopreneurs, and small tourism boards.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -69,10 +69,10 @@ export default function MarketingPage() {
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs text-os-muted">
                   {[
-                    'Upload and tag assets',
+                    'Ask the DAM in natural language',
+                    'AI auto-tagging + metadata',
+                    'Campaign-ready variants',
                     'Search by campaign or rights',
-                    'AI auto-tagging',
-                    'Download ready files',
                   ].map((item) => (
                     <span
                       key={item}
@@ -87,16 +87,16 @@ export default function MarketingPage() {
                 <p className="text-xs uppercase tracking-[0.3em] text-os-muted">Why teams choose it</p>
                 <div className="mt-4 space-y-4 text-sm text-os-muted">
                   <div className="rounded-2xl border border-black/10 bg-os-bg p-4">
-                    <p className="text-sm font-semibold text-os-text">Lightweight by design</p>
-                    <p>No enterprise complexity. Just a clean image library.</p>
+                    <p className="text-sm font-semibold text-os-text">Ask the DAM</p>
+                    <p>Search with intent: “cozy winter lifestyle shots”.</p>
+                  </div>
+                  <div className="rounded-2xl border border-black/10 bg-os-bg p-4">
+                    <p className="text-sm font-semibold text-os-text">Campaign-ready variants</p>
+                    <p>Generate Instagram, Pinterest, and banner crops instantly.</p>
                   </div>
                   <div className="rounded-2xl border border-black/10 bg-os-bg p-4">
                     <p className="text-sm font-semibold text-os-text">Bring your own Cloudinary</p>
-                    <p>Your assets stay in your account. We handle the interface.</p>
-                  </div>
-                  <div className="rounded-2xl border border-black/10 bg-os-bg p-4">
-                    <p className="text-sm font-semibold text-os-text">Search that feels natural</p>
-                    <p>Find by tags, campaign, rights, or image number.</p>
+                    <p>Your assets stay in your account. We handle the AI layer.</p>
                   </div>
                 </div>
               </div>
@@ -108,16 +108,16 @@ export default function MarketingPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {
-                title: 'Upload with metadata',
-                copy: 'Add photographer, campaign, usage rights, and tags on upload.',
+                title: 'Ask the DAM',
+                copy: 'Natural language search finds assets even when tags are messy.',
               },
               {
-                title: 'AI-enhanced search',
-                copy: 'Use AI search or exact tags to find assets fast.',
+                title: 'Campaign-ready crops',
+                copy: 'AI smart-crop outputs Instagram, Pinterest, and banner sizes.',
               },
               {
-                title: 'Built for small teams',
-                copy: 'Perfect for marketing teams, agencies, and solopreneurs.',
+                title: 'Metadata that stays clean',
+                copy: 'Photographer, usage rights, and campaign info stay attached.',
               },
             ].map((feature) => (
               <div key={feature.title} className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">

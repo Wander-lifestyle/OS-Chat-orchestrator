@@ -5,7 +5,10 @@ export type AuditAction =
   | 'download'
   | 'upload_requested'
   | 'upload'
-  | 'settings_updated';
+  | 'settings_updated'
+  | 'ai_search'
+  | 'ai_index'
+  | 'variant_generated';
 
 export type AuditEvent = {
   orgId: string;

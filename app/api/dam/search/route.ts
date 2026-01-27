@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { auth } from '@clerk/nextjs/server';
-import { configureCloudinary, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
+import { configureCloudinary, getAssetsByIds, getCloudinarySettingsForOrg } from '@/lib/cloudinary';
 import { logAuditEvent } from '@/lib/audit';
+import { createEmbeddings } from '@/lib/embeddings';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 type SearchMode = 'strict' | 'semantic';
 
@@ -11,6 +13,10 @@ type DamSearchRequest = {
   cursor?: string;
   limit?: number;
   mode?: SearchMode;
+};
+
+type MatchRow = {
+  public_id: string;
 };
 
 type DamAsset = {
@@ -326,24 +332,52 @@ async function runSearch(request: NextRequest) {
   const parsedQuery = parseQuery(query);
   const resources = result.resources ?? [];
   let filtered: any[] = [];
+  let aiFallback = false;
 
-  if (parsedQuery.assetId) {
-    filtered = resources.filter((asset: any) =>
-      buildSearchableText(toSearchAsset(asset)).includes(parsedQuery.assetId as string),
-    );
-  } else if (isSemantic) {
-    const scored = resources
-      .map((asset: any) => {
-        const score = scoreAsset(toSearchAsset(asset), parsedQuery.terms);
-        return score > 0 ? { asset, score } : null;
-      })
-      .filter((item: { asset: any; score: number } | null): item is { asset: any; score: number } => item !== null);
-    scored.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
-    filtered = scored.map((item: { asset: any; score: number }) => item.asset);
-  } else {
-    filtered = resources.filter((asset: any) =>
-      matchesQuery(toSearchAsset(asset), parsedQuery),
-    );
+  if (isSemantic && query.trim().length > 0) {
+    try {
+      const embeddings = await createEmbeddings([query]);
+      const embedding = embeddings[0];
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase.rpc('match_asset_embeddings', {
+        query_embedding: embedding,
+        match_count: limit,
+        org_id: orgId,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const publicIds = (data ?? []).map((row: MatchRow) => row.public_id);
+      if (publicIds.length > 0) {
+        const semanticResources = await getAssetsByIds(publicIds);
+        const resourceMap = new Map(semanticResources.map((asset: any) => [asset.public_id, asset]));
+        filtered = publicIds.map((id: string) => resourceMap.get(id)).filter(Boolean);
+      } else {
+        aiFallback = true;
+      }
+    } catch (error) {
+      console.error('Semantic search error:', error);
+      aiFallback = true;
+    }
+  }
+
+  if (!isSemantic || aiFallback) {
+    if (parsedQuery.assetId) {
+      filtered = resources.filter((asset: any) =>
+        buildSearchableText(toSearchAsset(asset)).includes(parsedQuery.assetId as string),
+      );
+    } else {
+      const scored = resources
+        .map((asset: any) => {
+          const score = scoreAsset(toSearchAsset(asset), parsedQuery.terms);
+          return score > 0 ? { asset, score } : null;
+        })
+        .filter((item: { asset: any; score: number } | null): item is { asset: any; score: number } => item !== null);
+      scored.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+      filtered = scored.map((item: { asset: any; score: number }) => item.asset);
+    }
   }
 
   const assets = filtered.slice(0, limit).map(mapAsset);
@@ -353,12 +387,13 @@ async function runSearch(request: NextRequest) {
       await logAuditEvent({
         orgId,
         userId,
-        action: 'search',
+        action: isSemantic && !aiFallback ? 'ai_search' : 'search',
         details: {
           query,
           mode,
           total: filtered.length,
           returned: assets.length,
+          fallback: aiFallback,
         },
       });
     } catch (error) {
@@ -372,6 +407,7 @@ async function runSearch(request: NextRequest) {
     assets,
     next_cursor: result.next_cursor ?? null,
     mode,
+    ai_fallback: aiFallback,
   });
 }
 

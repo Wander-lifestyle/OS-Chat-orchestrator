@@ -25,6 +25,9 @@ export default function CloudinarySettingsPage() {
   });
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [indexStatus, setIndexStatus] = useState<'idle' | 'running' | 'error'>('idle');
+  const [indexMessage, setIndexMessage] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -91,6 +94,31 @@ export default function CloudinarySettingsPage() {
       console.error('Failed to save Cloudinary settings:', error);
       setStatus('error');
       setMessage('Unable to save settings.');
+    }
+  };
+
+  const runIndex = async () => {
+    setIndexStatus('running');
+    setIndexMessage('');
+    try {
+      const response = await fetch('/api/ai/index', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cursor: nextCursor || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setIndexStatus('error');
+        setIndexMessage(data.error || 'Unable to build AI index.');
+        return;
+      }
+      setNextCursor(data.next_cursor ?? null);
+      setIndexStatus('idle');
+      setIndexMessage(`Indexed ${data.indexed || 0} assets.`);
+    } catch (error) {
+      console.error('Indexing failed:', error);
+      setIndexStatus('error');
+      setIndexMessage('Unable to build AI index.');
     }
   };
 
@@ -214,6 +242,37 @@ export default function CloudinarySettingsPage() {
               </div>
             )}
           </form>
+        </div>
+
+        <div className="mt-6 rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">AI search index</h2>
+              <p className="text-sm text-os-muted">
+                Build semantic search for your workspace assets.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={runIndex}
+              disabled={indexStatus === 'running'}
+              className="h-11 rounded-xl bg-os-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-black/20"
+            >
+              {indexStatus === 'running' ? 'Indexing...' : 'Build AI index'}
+            </button>
+          </div>
+          {indexMessage && (
+            <p className="mt-3 text-xs text-os-muted">{indexMessage}</p>
+          )}
+          {nextCursor && (
+            <button
+              type="button"
+              onClick={runIndex}
+              className="mt-3 text-xs font-semibold text-os-text underline"
+            >
+              Continue indexing
+            </button>
+          )}
         </div>
       </main>
     </div>
