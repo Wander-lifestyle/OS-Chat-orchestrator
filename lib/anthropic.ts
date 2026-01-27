@@ -6,7 +6,7 @@ const parseNumber = (value: string | undefined, fallback: number) => {
 };
 
 export const DEFAULT_MODEL =
-  process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
+  process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-latest';
 export const DEFAULT_MAX_TOKENS = parseNumber(
   process.env.ANTHROPIC_MAX_TOKENS,
   900
