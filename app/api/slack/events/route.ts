@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { runEditorialAgent, type AgentOS } from '@/lib/agent-runner';
+import { runEditorialAgent, type AgentTrack } from '@/lib/agent-runner';
 import { postNotification } from '@/lib/slack';
+import { getClientIdForSlackChannel } from '@/lib/client-config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -9,13 +10,9 @@ export const maxDuration = 60;
 const SIGNATURE_VERSION = 'v0';
 const MAX_AGE_SECONDS = 60 * 5;
 
-const toAgentLevel = (value: unknown): 3 | 4 | 5 => {
-  if (value === 4 || value === 5) return value;
-  return 3;
-};
-
-const toAgentOS = (value: unknown): AgentOS => {
+const toAgentTrack = (value: unknown): AgentTrack => {
   if (value === 'social') return 'social';
+  if (value === 'press_release') return 'press_release';
   return 'newsletter';
 };
 
@@ -47,15 +44,12 @@ const verifySlackSignature = (
 const normalizeSlackText = (text: string) =>
   text.replace(/<@[^>]+>/g, '').replace(/^[\s:,.-]+/, '').trim();
 
-const detectAgentLevel = (text: string, fallback: 3 | 4 | 5) => {
-  const match = text.match(/\b(?:level|lvl|l)\s*(3|4|5)\b/i);
-  if (!match) return fallback;
-  return toAgentLevel(Number(match[1]) as 3 | 4 | 5);
-};
-
-const detectAgentOS = (text: string, fallback: AgentOS) => {
+const detectTrack = (text: string, fallback: AgentTrack) => {
   if (/\bsocial\b/i.test(text)) {
     return 'social';
+  }
+  if (/\bpress\b|\bpress release\b/i.test(text)) {
+    return 'press_release';
   }
   if (/\bnewsletter\b/i.test(text)) {
     return 'newsletter';
@@ -63,13 +57,30 @@ const detectAgentOS = (text: string, fallback: AgentOS) => {
   return fallback;
 };
 
-const formatToolSummary = (tools: Awaited<ReturnType<typeof runEditorialAgent>>['tools']) => {
+const formatToolSummary = (
+  tools: Awaited<ReturnType<typeof runEditorialAgent>>['tools']
+) => {
   if (!tools.length) return '';
   const lines = tools.map((tool) => {
     const marker = tool.ok ? '✅' : '⚠️';
     return `${marker} ${tool.name}: ${tool.summary}`;
   });
   return `\n\n*Tool activity:*\n${lines.join('\n')}`;
+};
+
+const formatRecordLinks = (
+  records: Awaited<ReturnType<typeof runEditorialAgent>>['records']
+) => {
+  if (!records) return '';
+  const lines: string[] = [];
+  if (records.outputUrl) {
+    lines.push(`• Output: ${records.outputUrl}`);
+  }
+  if (records.ledgerUrl) {
+    lines.push(`• Ledger: ${records.ledgerUrl}`);
+  }
+  if (!lines.length) return '';
+  return `\n\n*Notion links:*\n${lines.join('\n')}`;
 };
 
 export async function POST(request: NextRequest) {
@@ -121,12 +132,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const defaultLevel = toAgentLevel(
-    Number(process.env.SLACK_DEFAULT_AGENT_LEVEL || '3') as 3 | 4 | 5
-  );
-  const defaultOS = toAgentOS(process.env.SLACK_DEFAULT_OS);
-  const agentLevel = detectAgentLevel(cleaned, defaultLevel);
-  const agentOS = detectAgentOS(cleaned, defaultOS);
+  const defaultTrack = toAgentTrack(process.env.SLACK_DEFAULT_TRACK);
+  const track = detectTrack(cleaned, defaultTrack);
 
   const channel = event.channel || process.env.SLACK_DEFAULT_CHANNEL;
   if (!channel) {
@@ -137,15 +144,16 @@ export async function POST(request: NextRequest) {
   }
 
   const threadTs = event.thread_ts || event.ts;
+  const clientId = getClientIdForSlackChannel(event.channel);
 
   try {
     const result = await runEditorialAgent({
       message: cleaned,
-      agentLevel,
-      os: agentOS,
+      clientId,
+      track,
     });
 
-    const reply = `${result.response}${formatToolSummary(result.tools)}`;
+    const reply = `${result.response}${formatToolSummary(result.tools)}${formatRecordLinks(result.records)}`;
 
     await postNotification({
       channel,

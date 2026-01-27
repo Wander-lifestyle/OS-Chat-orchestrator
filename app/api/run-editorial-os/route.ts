@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runEditorialAgent, type AgentOS } from '@/lib/agent-runner';
+import { runEditorialAgent, type AgentTrack } from '@/lib/agent-runner';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const ALLOWED_LEVELS = new Set([3, 4, 5]);
-const ALLOWED_OS = new Set<AgentOS>(['newsletter', 'social']);
+const ALLOWED_TRACKS = new Set<AgentTrack>([
+  'newsletter',
+  'social',
+  'press_release',
+]);
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || '*',
@@ -16,20 +19,8 @@ const CORS_HEADERS = {
 
 type RunEditorialRequest = {
   message?: unknown;
-  agentLevel?: unknown;
-  os?: unknown;
-};
-
-const toAgentLevel = (value: unknown): 3 | 4 | 5 | null => {
-  const numeric =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : NaN;
-  return ALLOWED_LEVELS.has(numeric as 3 | 4 | 5)
-    ? (numeric as 3 | 4 | 5)
-    : null;
+  clientId?: unknown;
+  track?: unknown;
 };
 
 const toMessage = (value: unknown): string | null => {
@@ -38,7 +29,7 @@ const toMessage = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const toAgentOS = (value: unknown): AgentOS | null => {
+const toAgentTrack = (value: unknown): AgentTrack | null => {
   if (value === undefined || value === null) {
     return 'newsletter';
   }
@@ -46,9 +37,15 @@ const toAgentOS = (value: unknown): AgentOS | null => {
     return null;
   }
   const normalized = value.trim().toLowerCase();
-  return ALLOWED_OS.has(normalized as AgentOS)
-    ? (normalized as AgentOS)
+  return ALLOWED_TRACKS.has(normalized as AgentTrack)
+    ? (normalized as AgentTrack)
     : null;
+};
+
+const toClientId = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 };
 
 const withCors = (response: NextResponse) => {
@@ -88,8 +85,8 @@ export async function POST(request: NextRequest) {
   }
 
   const message = toMessage(payload.message);
-  const agentLevel = toAgentLevel(payload.agentLevel);
-  const agentOS = toAgentOS(payload.os);
+  const clientId = toClientId(payload.clientId);
+  const track = toAgentTrack(payload.track);
 
   if (!message) {
     return jsonResponse(
@@ -98,18 +95,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!agentLevel) {
-    return jsonResponse(
-      { status: 'error', response: 'agentLevel must be 3, 4, or 5.' },
-      { status: 400 }
-    );
-  }
-
-  if (!agentOS) {
+  if (!track) {
     return jsonResponse(
       {
         status: 'error',
-        response: 'os must be one of: newsletter, social.',
+        response: 'track must be one of: newsletter, social, press_release.',
       },
       { status: 400 }
     );
@@ -118,14 +108,15 @@ export async function POST(request: NextRequest) {
   try {
     const result = await runEditorialAgent({
       message,
-      agentLevel,
-      os: agentOS,
+      clientId,
+      track,
     });
 
     return jsonResponse({
       status: 'success',
       response: result.response,
       tools: result.tools,
+      records: result.records,
     });
   } catch (error) {
     const message =

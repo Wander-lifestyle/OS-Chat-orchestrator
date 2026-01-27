@@ -1,10 +1,9 @@
-# Editorial OS Bridge
+# Editorial OS v1 Bridge
 
-Lightweight Next.js project that pairs a clean chat UI with a single
-bridge API. Messages are forwarded to Anthropic via a prompt-driven
-agent runner, which can call server-side tools (Notion, Beehiiv,
-Cloudinary, Slack). No database, no orchestration layer—just
-UI → API → Agent → Tools.
+Lightweight Next.js project that pairs a Slack interface with a single
+agent runner. The agent is stateless, Notion is the source of truth, and
+skills are loaded per client from Notion. Tools are execution-only and
+are invoked by the agent after skills run.
 
 ## Requirements
 
@@ -39,10 +38,11 @@ Returns a simple health check:
 Input:
 
 ```json
-{ "message": "string", "agentLevel": 3, "os": "newsletter" }
+{ "message": "string", "clientId": "wander", "track": "newsletter" }
 ```
 
-`agentLevel` accepts 3, 4, or 5. `os` is optional (defaults to `newsletter`).
+`track` accepts `newsletter`, `social`, or `press_release`. `clientId` is optional
+and defaults to `NOTION_DEFAULT_CLIENT_ID`.
 
 Output:
 
@@ -51,8 +51,12 @@ Output:
   "status": "success",
   "response": "string",
   "tools": [
-    { "name": "create_ledger_entry", "ok": true, "summary": "..." }
-  ]
+    { "name": "schedule_beehiiv_newsletter", "ok": true, "summary": "..." }
+  ],
+  "records": {
+    "outputUrl": "https://www.notion.so/...",
+    "ledgerUrl": "https://www.notion.so/..."
+  }
 }
 ```
 
@@ -61,7 +65,7 @@ Output:
 ```bash
 curl -X POST http://localhost:3000/api/run-editorial-os \
   -H "Content-Type: application/json" \
-  -d '{"message":"Draft a newsletter intro","agentLevel":3,"os":"newsletter"}'
+  -d '{"message":"Draft a newsletter intro","clientId":"wander","track":"newsletter"}'
 ```
 
 ### POST /api/slack/events
@@ -84,13 +88,14 @@ responds in the same channel/thread.
    - `SLACK_BOT_TOKEN`
    - `SLACK_SIGNING_SECRET`
    - `SLACK_DEFAULT_CHANNEL` (optional)
-   - `SLACK_DEFAULT_AGENT_LEVEL` (optional)
-   - `SLACK_DEFAULT_OS` (optional)
+   - `SLACK_DEFAULT_TRACK` (optional)
+   - `SLACK_DEFAULT_CLIENT_ID` (optional)
+   - `SLACK_CHANNEL_CLIENT_MAP` (optional JSON map)
 
 ## Configuration
 
-The bridge uses Anthropic directly. Agent prompts live in `/agents` and
-tools live in `/lib`.
+The bridge uses Anthropic directly. Skills and client state live in Notion.
+Tools live in `/lib`.
 
 Environment variables:
 
@@ -101,31 +106,44 @@ Environment variables:
 - `EDITORIAL_OS_TOOL_TIMEOUT_MS` (optional)
 - `NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL` (default: same origin)
 - `CORS_ALLOW_ORIGIN` (default: `*`)
-- `NOTION_TOKEN`, `NOTION_LEDGER_DB_ID`
+- `NOTION_TOKEN`
+- `NOTION_DEFAULT_CLIENT_ID`, `NOTION_DEFAULT_CLIENT_NAME`
+- `NOTION_BASE_OS_PAGE_ID`, `NOTION_SKILLS_DB_ID`
+- `NOTION_OUTPUTS_DB_ID`, `NOTION_HISTORY_DB_ID`
+- `NOTION_LEDGER_DB_ID`
+- `NOTION_CLIENT_CONFIG_JSON` (optional per-client map)
 - `NOTION_VERSION` (optional, default `2022-06-28`)
 - `NOTION_TITLE_FIELD`, `NOTION_STATUS_FIELD`, `NOTION_STATUS_TYPE`
 - `NOTION_SUMMARY_FIELD`, `NOTION_TAGS_FIELD`
+- `NOTION_LEDGER_OUTPUT_FIELD`, `NOTION_LEDGER_OUTPUT_FIELD_TYPE`
+- `NOTION_SKILLS_*` fields (see .env.local.example)
+- `NOTION_OUTPUTS_*` fields (see .env.local.example)
 - `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`, `BEEHIIV_API_BASE_URL`
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 - `SLACK_BOT_TOKEN`
 - `SLACK_SIGNING_SECRET`
 - `SLACK_DEFAULT_CHANNEL`
-- `SLACK_DEFAULT_AGENT_LEVEL`
-- `SLACK_DEFAULT_OS`
+- `SLACK_DEFAULT_TRACK`
+- `SLACK_DEFAULT_CLIENT_ID`
+- `SLACK_CHANNEL_CLIENT_MAP`
+- `EDITORIAL_OUTPUT_STATUS_IN_REVIEW`
+- `EDITORIAL_LEDGER_STATUS_IN_PROGRESS`
+- `EDITORIAL_LEDGER_STATUS_IN_REVIEW`
+- `EDITORIAL_LEDGER_STATUS_COMPLETED`
+- `EDITORIAL_BASE_OS_TEXT`
 
-## Agent Prompts
+## Notion as Source of Truth
 
-Agent prompts live in the `/agents` directory:
+Editorial OS v1 stores all state in Notion:
 
-- `agents/newsletter-level-3.md`
-- `agents/newsletter-level-4.md`
-- `agents/newsletter-level-5.md`
-- `agents/social-level-3.md`
-- `agents/social-level-4.md`
-- `agents/social-level-5.md`
+- Client Base OS page
+- Claude Skills database
+- Historical Files database
+- Editorial Outputs database
+- Ledger database (jobs in progress, queue, completed)
 
-To add a new OS later, create new prompt files and allow the `os` value
-in the API route.
+Skills are loaded on each request. The agent is stateless and only uses
+the data in the client’s Notion space.
 
 ## Tools
 
@@ -142,8 +160,8 @@ payload mappings as your services evolve.
 ## Bridge Notes
 
 - One endpoint: `/api/run-editorial-os`.
-- Stateless: no database or session tracking.
-- Tools are explicit and easy to extend.
+- One agent: Level 4 only.
+- Notion is the system of record for every client.
 
 ## Production
 

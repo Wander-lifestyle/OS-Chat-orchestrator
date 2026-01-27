@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-type AgentLevel = 3 | 4 | 5;
-
 type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -28,18 +26,6 @@ type RunEditorialResponse = {
   response?: string;
   tools?: ToolActivity[];
 };
-
-type AgentLevelOption = {
-  level: AgentLevel;
-  name: string;
-  description: string;
-};
-
-const AGENT_LEVEL_OPTIONS: AgentLevelOption[] = [
-  { level: 3, name: 'Level 3', description: 'Fast and efficient' },
-  { level: 4, name: 'Level 4', description: 'Balanced' },
-  { level: 5, name: 'Level 5', description: 'Most capable' },
-];
 
 const QUICK_ACTIONS = [
   { label: 'Run security audit' },
@@ -80,48 +66,14 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-const AgentLevelSelector = ({
-  value,
-  onChange,
-}: {
-  value: AgentLevel;
-  onChange: (value: AgentLevel) => void;
-}) => {
-  const selected = AGENT_LEVEL_OPTIONS.find((option) => option.level === value);
-
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-slate-500">Agent level</label>
-      <select
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value) as AgentLevel)}
-        className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm"
-      >
-        {AGENT_LEVEL_OPTIONS.map((option) => (
-          <option key={option.level} value={option.level}>
-            {option.name} - {option.description}
-          </option>
-        ))}
-      </select>
-      <span className="text-xs text-slate-500">
-        {selected?.description}
-      </span>
-    </div>
-  );
-};
-
 const ChatInput = ({
   onSend,
   placeholder,
   disabled,
-  agentLevel,
-  onAgentLevelChange,
 }: {
   onSend: (content: string) => void;
   placeholder: string;
   disabled: boolean;
-  agentLevel: AgentLevel;
-  onAgentLevelChange: (value: AgentLevel) => void;
 }) => {
   const [input, setInput] = useState('');
 
@@ -135,25 +87,22 @@ const ChatInput = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <AgentLevelSelector value={agentLevel} onChange={onAgentLevelChange} />
-        <div className="flex flex-1 gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={placeholder}
-            disabled={disabled}
-            className="h-10 flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={disabled || !input.trim()}
-            className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {disabled ? 'Running...' : 'Send'}
-          </button>
-        </div>
+      <div className="flex flex-1 gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="h-10 flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={disabled || !input.trim()}
+          className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
+        >
+          {disabled ? 'Running...' : 'Send'}
+        </button>
       </div>
     </form>
   );
@@ -291,7 +240,6 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [agentLevel, setAgentLevel] = useState<AgentLevel>(4);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -322,7 +270,7 @@ export default function Home() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: trimmed,
-            agentLevel,
+            track: 'newsletter',
           }),
         }
       );
@@ -427,8 +375,6 @@ export default function Home() {
                 onSend={handleSendMessage}
                 placeholder="Ask Editorial OS to help..."
                 disabled={isLoading}
-                agentLevel={agentLevel}
-                onAgentLevelChange={setAgentLevel}
               />
 
               <QuickActions
@@ -449,8 +395,6 @@ export default function Home() {
                   onSend={handleSendMessage}
                   placeholder="Ask Editorial OS to help..."
                   disabled={isLoading}
-                  agentLevel={agentLevel}
-                  onAgentLevelChange={setAgentLevel}
                 />
               </div>
             </>
