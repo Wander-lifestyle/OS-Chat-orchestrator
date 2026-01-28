@@ -1,194 +1,152 @@
-# Editorial OS
+# Editorial OS v1 Bridge
 
-AI-first operating system for content and communications. One chat, all tools.
+Lightweight Next.js project that pairs a Slack interface with a single
+agent runner. The agent is stateless, Notion is the source of truth, and
+skills are loaded per client from Notion. Tools are execution-only and
+are invoked by the agent after skills run.
 
-## The Vision
+## Requirements
 
-```
-┌─────────────────────────────────────────────────┐
-│  ◈ Editorial OS                                 │
-├─────────────────────────────────────────────────┤
-│  [ Brief Engine ]  [ Campaign Deck ]  [ DAM ]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │ "Create a brief for EU eSIM launch..."   │  │
-│  └───────────────────────────────────────────┘  │
-│                                    [Send ✨]    │
-│                                                 │
-│  🤖 Editorial OS:                              │
-│  ✓ Brief created                               │
-│  ✓ Added to Campaign Deck (status: intake)     │
-│  ✓ Slack notified                              │
-│                                                 │
-│  [View Brief] [View in Deck] [Search DAM]      │
-└─────────────────────────────────────────────────┘
-```
+- Node.js 18+
+- Anthropic API key
+- Optional API credentials for Notion, Beehiiv, Cloudinary, Slack
 
-## Quick Start
+## Setup
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy environment variables
-cp .env.example .env.local
-
-# Start development server
+cp .env.local.example .env.local
 npm run dev
 ```
 
-## Environment Variables
+The dev server runs on http://localhost:3000.
 
-**Required**: Set these in Vercel or your `.env.local`:
+Open the UI at http://localhost:3000 and send a message from the chat.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
-| `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
+## Endpoints
 
-## Deploy to Vercel
+### GET /api/health
 
-### Option 1: Via GitHub
+Returns a simple health check:
 
-1. Push this repo to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/new)
-3. Set environment variables in Project Settings → Environment Variables
-4. Deploy
+```json
+{ "status": "ok" }
+```
 
-### Option 2: Via CLI
+### POST /api/run-editorial-os
+
+Input:
+
+```json
+{ "message": "string", "clientId": "wander", "track": "newsletter" }
+```
+
+`track` accepts `newsletter`, `social`, or `press_release`. `clientId` is optional
+and defaults to `NOTION_DEFAULT_CLIENT_ID`.
+
+Output:
+
+```json
+{
+  "status": "success",
+  "response": "string",
+  "tools": [
+    { "name": "schedule_beehiiv_newsletter", "ok": true, "summary": "..." }
+  ],
+  "records": {
+    "outputUrl": "https://www.notion.so/...",
+    "ledgerUrl": "https://www.notion.so/..."
+  }
+}
+```
+
+#### Example
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Preview deploy (staging)
-vercel
-
-# Production deploy
-vercel --prod
+curl -X POST http://localhost:3000/api/run-editorial-os \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Draft a newsletter intro","clientId":"wander","track":"newsletter"}'
 ```
 
-### Setting Environment Variables in Vercel
+## Slack Notifications (Optional)
 
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
-   - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
+This build uses the web UI as the only interface, but can still post
+notifications to Slack when a draft is ready.
 
-## How It Works
+Set:
+- `SLACK_BOT_TOKEN`
+- `SLACK_NOTIFICATION_CHANNEL`
 
-1. **You type** a natural language request
-2. **Router** determines which module handles it (Brief, Deck, DAM)
-3. **Executor** calls the appropriate API with timeout handling
-4. **Results** displayed with action buttons
+## Configuration
 
-## Connected Modules
+The bridge uses Anthropic directly. Skills and client state live in Notion.
+Tools live in `/lib`.
 
-| Module | Purpose | URL |
-|--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
-| Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
+Environment variables:
 
-## Example Queries
+- `ANTHROPIC_API_KEY` (required)
+- `ANTHROPIC_MODEL` (optional)
+- `ANTHROPIC_MAX_TOKENS` (optional)
+- `ANTHROPIC_TEMPERATURE` (optional)
+- `EDITORIAL_OS_TOOL_TIMEOUT_MS` (optional)
+- `NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL` (default: same origin)
+- `CORS_ALLOW_ORIGIN` (default: `*`)
+- `NOTION_TOKEN`
+- `NOTION_DEFAULT_CLIENT_ID`, `NOTION_DEFAULT_CLIENT_NAME`
+- `NOTION_BASE_OS_PAGE_ID`, `NOTION_SKILLS_DB_ID`
+- `NOTION_OUTPUTS_DB_ID`, `NOTION_HISTORY_DB_ID`
+- `NOTION_LEDGER_DB_ID`
+- `NOTION_CLIENT_CONFIG_JSON` (optional per-client map)
+- `NOTION_VERSION` (optional, default `2022-06-28`)
+- `NOTION_TITLE_FIELD`, `NOTION_STATUS_FIELD`, `NOTION_STATUS_TYPE`
+- `NOTION_SUMMARY_FIELD`, `NOTION_TAGS_FIELD`
+- `NOTION_LEDGER_OUTPUT_FIELD`, `NOTION_LEDGER_OUTPUT_FIELD_TYPE`
+- `NOTION_SKILLS_*` fields (see .env.local.example)
+- `NOTION_OUTPUTS_*` fields (see .env.local.example)
+- `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`, `BEEHIIV_API_BASE_URL`
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+- `SLACK_BOT_TOKEN`
+- `SLACK_NOTIFICATION_CHANNEL`
+- `EDITORIAL_OUTPUT_STATUS_IN_REVIEW`
+- `EDITORIAL_LEDGER_STATUS_IN_PROGRESS`
+- `EDITORIAL_LEDGER_STATUS_IN_REVIEW`
+- `EDITORIAL_LEDGER_STATUS_COMPLETED`
+- `EDITORIAL_BASE_OS_TEXT`
 
-**Creating briefs:**
-- "Create a brief for EU eSIM launch"
-- "New campaign for Q1 brand awareness targeting millennials"
-- "Make a brief called Holiday Sale for email and Instagram"
+## Notion as Source of Truth
 
-**Checking campaigns:**
-- "Show me active campaigns"
-- "What's the status of the EU launch?"
-- "List all projects"
+Editorial OS v1 stores all state in Notion:
 
-**Finding assets:**
-- "Find hero images for Instagram"
-- "Search for travel photos"
-- "I need visuals for the EU campaign"
+- Client Base OS page
+- Claude Skills database
+- Historical Files database
+- Editorial Outputs database
+- Ledger database (jobs in progress, queue, completed)
 
-## Architecture
+Skills are loaded on each request. The agent is stateless and only uses
+the data in the client’s Notion space.
 
+## Tools
+
+Tool helpers are intentionally thin and live in `/lib`:
+
+- `lib/notion-ledger.ts`
+- `lib/beehiiv.ts`
+- `lib/cloudinary.ts`
+- `lib/slack.ts`
+
+These call real APIs. Keep credentials in `.env.local` and update any
+payload mappings as your services evolve.
+
+## Bridge Notes
+
+- One endpoint: `/api/run-editorial-os`.
+- One agent: Level 4 only.
+- Notion is the system of record for every client.
+
+## Production
+
+```bash
+npm run build
+npm run start
 ```
-User Query
-    ↓
-Editorial OS (API Route)
-    ↓
-Router (with 5s timeout)
-    ↓
-┌───────────┬───────────┬───────────┐
-│  Brief    │  Campaign │   Light   │
-│  Engine   │   Deck    │    DAM    │
-└───────────┴───────────┴───────────┘
-    ↓
-Results + Actions
-```
-
-## The Flow
-
-```
-"Create a brief for EU eSIM launch"
-    ↓
-API Route: POST /api/chat
-    ↓
-Router: module=brief, intent=create
-    ↓
-POST brief-engine.vercel.app/api/brief/create (5s timeout)
-    ↓
-Brief Engine: Creates brief + POSTs to Campaign Deck
-    ↓
-Campaign Deck: Creates ledger entry (intake)
-    ↓
-Editorial OS: "✓ Brief created. ✓ Added to Deck."
-    ↓
-Action buttons: [View Brief] [View in Deck]
-```
-
-## Project Structure
-
-```
-editorial-os/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # API endpoint for chat
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main chat interface
-├── components/
-│   ├── ChatInput.tsx         # Message input component
-│   ├── ChatMessage.tsx       # Message display component
-│   ├── ErrorBoundary.tsx     # Error handling wrapper
-│   └── ModuleTabs.tsx        # Module navigation tabs
-├── lib/
-│   ├── router.ts             # Query routing logic
-│   └── types.ts              # TypeScript types
-├── .env.example              # Environment variables template
-├── .gitignore
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-└── tsconfig.json
-```
-
-## This is the Product
-
-Not individual tools. One unified interface.
-
-- **Solopreneur**: "Create a brief for my launch" → Done
-- **Marketing team**: "Show active campaigns" → Dashboard
-- **Agency**: "Find assets for client X" → Results
-
-All from one chat box.
-
----
-
-Part of Editorial OS. Built for content operations at any scale.

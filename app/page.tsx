@@ -1,410 +1,613 @@
-// EDITORIAL OS - Chat-First Interface (PRODUCTION GRADE)
-// File: Replace /app/page.tsx in your os-chat app
-// Tested against your actual APIs - no debugging required
-
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-// Types matching your actual APIs
-interface Message {
+type Message = {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
-  progress?: ProgressItem[];
-  results?: OrchestrationResult;
-}
+  tools?: ToolActivity[];
+  records?: RecordLinks;
+};
 
-interface ProgressItem {
-  step: string;
-  status: 'pending' | 'running' | 'complete' | 'error';
-  details?: string;
-  link?: string;
-  timing?: string;
-}
-
-interface OrchestrationResult {
-  success: boolean;
-  campaign_id?: string;
-  brief_created?: boolean;
-  ledger_entry?: string;
-  assets_found?: number;
-  manual_links: {
-    brief?: string;
-    ledger?: string;
-    dam?: string;
+type ToolActivity = {
+  name: string;
+  ok: boolean;
+  summary: string;
+  data?: {
+    id?: string;
+    status?: string;
+    url?: string;
+    channel?: string;
   };
-  next_steps?: string[];
-}
+};
 
-export default function EditorialOSChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: `# Welcome to Editorial OS 🚀
+type RunEditorialResponse = {
+  status?: string;
+  response?: string;
+  tools?: ToolActivity[];
+  records?: RecordLinks;
+};
 
-I'm your AI orchestrator for content and communications. I can:
+type RecordLinks = {
+  outputUrl?: string;
+  ledgerUrl?: string;
+  ledgerStatus?: string;
+};
 
-**🎯 Launch Complete Campaigns:**
-• "Launch campaign for Europe eSIM with newsletter and social"
-• "Create Q2 product announcement across all channels"
+type Track = 'newsletter' | 'social' | 'press_release';
 
-**📝 Create & Track:**
-• "Create brief for our new feature launch"
-• "Show me active campaigns"
+type RunSummary = {
+  ok: boolean;
+  at: string;
+  track: Track;
+  clientId?: string;
+  outputUrl?: string;
+  ledgerUrl?: string;
+  ledgerStatus?: string;
+  error?: string;
+};
 
-**🔍 Find Assets:**
-• "Find hero images for Instagram posts"
+const TRACK_OPTIONS: Array<{ value: Track; label: string }> = [
+  { value: 'newsletter', label: 'Newsletter' },
+  { value: 'social', label: 'Social' },
+  { value: 'press_release', label: 'Press Release' },
+];
 
-Just tell me what you need - I'll orchestrate everything behind the scenes.`,
-      timestamp: new Date(),
-    },
-  ]);
+const QUICK_ACTIONS = [
+  { label: 'Run security audit' },
+  { label: 'Generate API docs' },
+  { label: 'Create new feature' },
+  { label: 'Debug issue' },
+];
 
-  const [input, setInput] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+const API_BASE_URL = (process.env.NEXT_PUBLIC_EDITORIAL_OS_API_BASE_URL || '')
+  .replace(/\/$/, '');
 
-  // Auto-scroll to bottom of messages
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+const cn = (...classes: Array<string | false | null | undefined>) =>
+  classes.filter(Boolean).join(' ');
+
+const formatToolName = (name: string) =>
+  name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 767px)');
+    const handleChange = () => setIsMobile(media.matches);
 
-  // Generate unique message ID
-  const generateMessageId = useCallback(() => {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  }, []);
-
-  // Handle form submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isProcessing) return;
-
-    const userMessage: Message = {
-      id: generateMessageId(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsProcessing(true);
-
-    try {
-      // Call the master orchestrator
-      const response = await fetch('/api/orchestrate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          conversation_id: 'main-chat',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Create assistant response with results
-      const assistantMessage: Message = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: data.response || 'Task completed successfully!',
-        timestamp: new Date(),
-        progress: data.progress || [],
-        results: data.results || null,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('Orchestration error:', error);
-      
-      // Add error message
-      const errorMessage: Message = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: `❌ I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}\n\nTry again or check that all services are running.`,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsProcessing(false);
+    handleChange();
+    if (media.addEventListener) {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
     }
-  }, [input, isProcessing, generateMessageId]);
 
-  // Format timestamp
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
   }, []);
 
-  // Render progress items
-  const renderProgress = useCallback((progress: ProgressItem[]) => {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
-        <h4 className="font-semibold text-blue-900 mb-2">🔄 Orchestration Progress</h4>
-        <div className="space-y-2">
-          {progress.map((item, index) => (
-            <div key={index} className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                {item.status === 'complete' && <span className="text-green-600">✓</span>}
-                {item.status === 'running' && <span className="text-blue-600">🔄</span>}
-                {item.status === 'pending' && <span className="text-gray-400">⏳</span>}
-                {item.status === 'error' && <span className="text-red-600">❌</span>}
-              </div>
-              <div className="flex-1">
-                <span className={`font-medium ${
-                  item.status === 'complete' ? 'text-green-800' :
-                  item.status === 'running' ? 'text-blue-800' :
-                  item.status === 'error' ? 'text-red-800' :
-                  'text-gray-600'
-                }`}>
-                  {item.step}
-                </span>
-                {item.details && (
-                  <div className="text-sm text-gray-600 mt-1">{item.details}</div>
-                )}
-                {item.link && (
-                  <a 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 underline"
-                  >
-                    View →
-                  </a>
-                )}
-              </div>
-              {item.timing && (
-                <span className="text-xs text-gray-500">{item.timing}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }, []);
+  return isMobile;
+};
 
-  // Render orchestration results
-  const renderResults = useCallback((results: OrchestrationResult) => {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-3">
-        <h4 className="font-semibold text-green-900 mb-3">
-          ✅ {results.success ? 'Orchestration Complete' : 'Partial Success'}
-        </h4>
-        
-        {/* Campaign Summary */}
-        {results.campaign_id && (
-          <div className="mb-3">
-            <span className="font-medium text-green-800">Campaign ID: </span>
-            <code className="bg-green-100 px-2 py-1 rounded text-sm">{results.campaign_id}</code>
-          </div>
-        )}
+const ChatInput = ({
+  onSend,
+  placeholder,
+  disabled,
+}: {
+  onSend: (content: string) => void;
+  placeholder: string;
+  disabled: boolean;
+}) => {
+  const [input, setInput] = useState('');
 
-        {/* Manual Override Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-          {results.manual_links.brief && (
-            <a
-              href={results.manual_links.brief}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">📝</span>
-              <div>
-                <div className="font-medium text-green-900">Brief Engine</div>
-                <div className="text-sm text-green-600">Edit details</div>
-              </div>
-            </a>
-          )}
-          
-          {results.manual_links.ledger && (
-            <a
-              href={results.manual_links.ledger}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">📊</span>
-              <div>
-                <div className="font-medium text-green-900">Campaign Ledger</div>
-                <div className="text-sm text-green-600">Track progress</div>
-              </div>
-            </a>
-          )}
-
-          {results.manual_links.dam && (
-            <a
-              href={results.manual_links.dam}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 bg-white border border-green-200 rounded-lg hover:border-green-300 transition-colors"
-            >
-              <span className="text-lg">🖼️</span>
-              <div>
-                <div className="font-medium text-green-900">Light DAM</div>
-                <div className="text-sm text-green-600">Manage assets</div>
-              </div>
-            </a>
-          )}
-        </div>
-
-        {/* Next Steps */}
-        {results.next_steps && results.next_steps.length > 0 && (
-          <div>
-            <h5 className="font-medium text-green-900 mb-2">Next Steps:</h5>
-            <ul className="list-disc list-inside text-sm text-green-800 space-y-1">
-              {results.next_steps.map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  }, []);
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || disabled) return;
+    onSend(trimmed);
+    setInput('');
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Editorial OS</h1>
-              <p className="text-slate-600">AI-first content operations</p>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex flex-1 gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="h-10 flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={disabled || !input.trim()}
+          className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
+        >
+          {disabled ? 'Running...' : 'Send'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+const ChatMessages = ({
+  messages,
+  isLoading,
+}: {
+  messages: Message[];
+  isLoading: boolean;
+}) => (
+  <div className="space-y-4">
+    {messages.map((message) => (
+      <div
+        key={message.id}
+        className={cn(
+          'flex',
+          message.role === 'user' ? 'justify-end' : 'justify-start'
+        )}
+      >
+        <div
+          className={cn(
+            'max-w-[80%] rounded-lg px-4 py-3 text-sm shadow-sm',
+            message.role === 'user'
+              ? 'bg-slate-900 text-white'
+              : 'bg-white text-slate-900 border border-slate-200'
+          )}
+        >
+          <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.tools && message.tools.length > 0 && (
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <div className="font-medium text-slate-700">Tool activity</div>
+              <ul className="mt-2 space-y-2">
+                {message.tools.map((tool, index) => (
+                  <li key={`${tool.name}-${index}`} className="flex gap-2">
+                    <span
+                      className={
+                        tool.ok ? 'text-emerald-600' : 'text-rose-600'
+                      }
+                    >
+                      {tool.ok ? '✓' : '✕'}
+                    </span>
+                    <div>
+                      <div className="font-medium text-slate-700">
+                        {formatToolName(tool.name)}
+                      </div>
+                      <div className="text-slate-600">{tool.summary}</div>
+                      {tool.data?.status && (
+                        <div className="text-slate-500">
+                          Status: {tool.data.status}
+                        </div>
+                      )}
+                      {tool.data?.url && (
+                        <a
+                          href={tool.data.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-600 underline hover:text-slate-800"
+                        >
+                          Open link
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-slate-600">Connected</span>
+          )}
+          {(message.records?.outputUrl || message.records?.ledgerUrl) && (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+              <div className="font-medium text-slate-700">Notion links</div>
+              <ul className="mt-2 space-y-1">
+                {message.records?.outputUrl && (
+                  <li>
+                    Output:{' '}
+                    <a
+                      href={message.records.outputUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-slate-800"
+                    >
+                      View draft
+                    </a>
+                  </li>
+                )}
+                {message.records?.ledgerUrl && (
+                  <li>
+                    Ledger:{' '}
+                    <a
+                      href={message.records.ledgerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-slate-800"
+                    >
+                      View ledger
+                    </a>
+                  </li>
+                )}
+              </ul>
             </div>
-          </div>
+          )}
         </div>
       </div>
+    ))}
+    {isLoading && (
+      <div className="flex justify-start">
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+          Claude is thinking...
+        </div>
+      </div>
+    )}
+  </div>
+);
 
-      {/* Chat Container */}
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-[700px] flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-lg px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white ml-4'
-                      : 'bg-slate-50 text-slate-900 mr-4'
-                  }`}
-                >
-                  {/* Message Content */}
-                  <div className="prose prose-sm max-w-none">
-                    {message.content.includes('# ') ? (
-                      <div dangerouslySetInnerHTML={{
-                        __html: message.content
-                          .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mb-2">$1</h1>')
-                          .replace(/^## (.+)$/gm, '<h2 class="text-md font-semibold mb-1">$1</h2>')
-                          .replace(/^\*\*🎯 (.+):\*\*$/gm, '<div class="font-semibold text-blue-600 mt-3">🎯 $1:</div>')
-                          .replace(/^\*\*📝 (.+):\*\*$/gm, '<div class="font-semibold text-green-600 mt-3">📝 $1:</div>')
-                          .replace(/^\*\*🔍 (.+):\*\*$/gm, '<div class="font-semibold text-purple-600 mt-3">🔍 $1:</div>')
-                          .replace(/^• (.+)$/gm, '<li class="ml-4">$1</li>')
-                          .replace(/\n\n/g, '<br><br>')
-                          .replace(/\n/g, '<br>')
-                      }} />
-                    ) : (
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                    )}
-                  </div>
+const QuickActions = ({
+  actions,
+  onActionClick,
+}: {
+  actions: Array<{ label: string }>;
+  onActionClick: (label: string) => void;
+}) => (
+  <div className="flex flex-wrap justify-center gap-2">
+    {actions.map((action) => (
+      <button
+        key={action.label}
+        onClick={() => onActionClick(action.label)}
+        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm hover:border-slate-300"
+      >
+        {action.label}
+      </button>
+    ))}
+  </div>
+);
 
-                  {/* Progress */}
-                  {message.progress && message.progress.length > 0 && (
-                    <div className="mt-3">
-                      {renderProgress(message.progress)}
-                    </div>
-                  )}
-
-                  {/* Results */}
-                  {message.results && (
-                    <div className="mt-3">
-                      {renderResults(message.results)}
-                    </div>
-                  )}
-
-                  {/* Timestamp */}
-                  <div className={`text-xs mt-2 ${
-                    message.role === 'user' ? 'text-blue-200' : 'text-slate-500'
-                  }`}>
-                    {formatTimestamp(message.timestamp)}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Loading indicator */}
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-slate-50 rounded-lg px-4 py-3 mr-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    </div>
-                    <span className="text-sm text-slate-600">Orchestrating Editorial OS...</span>
-                  </div>
-                </div>
-              </div>
+const StatusSidebar = ({
+  isOpen,
+  onToggle,
+  isLoading,
+  track,
+  onTrackChange,
+  clientId,
+  onClientIdChange,
+  lastRun,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+  isLoading: boolean;
+  track: Track;
+  onTrackChange: (value: Track) => void;
+  clientId: string;
+  onClientIdChange: (value: string) => void;
+  lastRun: RunSummary | null;
+}) => (
+  <aside
+    className={cn(
+      'fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white shadow-sm transition-transform duration-300',
+      isOpen ? 'translate-x-0' : '-translate-x-full'
+    )}
+  >
+    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+      <span className="text-sm font-semibold text-slate-900">Editorial OS</span>
+      <button
+        onClick={onToggle}
+        className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
+      >
+        {isOpen ? 'Close' : 'Open'}
+      </button>
+    </div>
+    <div className="space-y-6 px-4 py-4 text-sm text-slate-600">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Status
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={cn(
+              'h-2.5 w-2.5 rounded-full',
+              isLoading
+                ? 'bg-amber-500'
+                : lastRun
+                  ? lastRun.ok
+                    ? 'bg-emerald-500'
+                    : 'bg-rose-500'
+                  : 'bg-slate-300'
             )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Form */}
-          <div className="border-t border-slate-200 p-6">
-            <form onSubmit={handleSubmit} className="flex gap-4">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Launch campaign for Europe eSIM with newsletter and social..."
-                disabled={isProcessing}
-                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-              />
-              <button
-                type="submit"
-                disabled={isProcessing || !input.trim()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                {isProcessing ? 'Processing...' : 'Send'}
-              </button>
-            </form>
-            
-            {/* Footer */}
-            <div className="text-center mt-3">
-              <p className="text-xs text-slate-500">
-                Connected to Brief Engine • Campaign Ledger • Light DAM
-              </p>
-            </div>
-          </div>
+          />
+          <span className="text-slate-700">
+            {isLoading
+              ? 'Running'
+              : lastRun
+                ? lastRun.ok
+                  ? 'Ready'
+                  : 'Error'
+                : 'Idle'}
+          </span>
         </div>
       </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Client ID
+        </div>
+        <input
+          type="text"
+          value={clientId}
+          onChange={(event) => onClientIdChange(event.target.value)}
+          placeholder="default"
+          className="mt-2 w-full rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-900"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Leave blank to use the default client.
+        </p>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Track
+        </div>
+        <select
+          value={track}
+          onChange={(event) => onTrackChange(event.target.value as Track)}
+          className="mt-2 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900"
+        >
+          {TRACK_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Last run
+        </div>
+        <div className="mt-2 space-y-1 text-sm text-slate-700">
+          <div>{lastRun ? lastRun.at : 'No runs yet'}</div>
+          {lastRun?.ledgerStatus && (
+            <div className="text-xs text-slate-500">
+              Ledger: {lastRun.ledgerStatus}
+            </div>
+          )}
+          {lastRun?.outputUrl && (
+            <a
+              href={lastRun.outputUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-500 underline hover:text-slate-700"
+            >
+              View output
+            </a>
+          )}
+          {lastRun?.ledgerUrl && (
+            <a
+              href={lastRun.ledgerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-500 underline hover:text-slate-700"
+            >
+              View ledger
+            </a>
+          )}
+          {lastRun?.error && (
+            <div className="text-xs text-rose-500">{lastRun.error}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  </aside>
+);
+
+export default function Home() {
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [track, setTrack] = useState<Track>('newsletter');
+  const [clientId, setClientId] = useState('');
+  const [lastRun, setLastRun] = useState<RunSummary | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  const handleSendMessage = async (content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: trimmed,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/run-editorial-os`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: trimmed,
+            track,
+            clientId: clientId.trim() || undefined,
+          }),
+        }
+      );
+
+      let data: RunEditorialResponse | null = null;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.error('Failed to parse response JSON', error);
+      }
+
+      const tools = Array.isArray(data?.tools) ? data?.tools : undefined;
+      const records = data?.records;
+
+      if (!response.ok) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `Error: ${data?.response || response.statusText}`,
+          tools,
+          records,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setLastRun({
+          ok: false,
+          at: new Date().toLocaleTimeString(),
+          track,
+          clientId: clientId.trim() || undefined,
+          outputUrl: records?.outputUrl,
+          ledgerUrl: records?.ledgerUrl,
+          ledgerStatus: records?.ledgerStatus,
+          error: data?.response || response.statusText,
+        });
+        return;
+      }
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data?.response || 'Command completed with no output.',
+        tools,
+        records,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setLastRun({
+        ok: true,
+        at: new Date().toLocaleTimeString(),
+        track,
+        clientId: clientId.trim() || undefined,
+        outputUrl: records?.outputUrl,
+        ledgerUrl: records?.ledgerUrl,
+        ledgerStatus: records?.ledgerStatus,
+      });
+    } catch (error) {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content:
+          error instanceof Error
+            ? `Error: ${error.message}`
+            : 'Error: Unable to reach the bridge.',
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setLastRun({
+        ok: false,
+        at: new Date().toLocaleTimeString(),
+        track,
+        clientId: clientId.trim() || undefined,
+        error:
+          error instanceof Error ? error.message : 'Unable to reach the bridge.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickAction = (label: string) => {
+    handleSendMessage(label);
+  };
+
+  const hasMessages = messages.length > 0;
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <StatusSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        isLoading={isLoading}
+        track={track}
+        onTrackChange={setTrack}
+        clientId={clientId}
+        onClientIdChange={setClientId}
+        lastRun={lastRun}
+      />
+
+      <main
+        className={cn(
+          'min-h-screen transition-all duration-300 ease-in-out',
+          sidebarOpen && !isMobile ? 'ml-72' : 'ml-0'
+        )}
+      >
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur sm:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 sm:hidden"
+            >
+              Menu
+            </button>
+            <span className="text-lg font-semibold">Editorial OS</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate-600">
+            <span className="hidden sm:inline">Bridge online</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white">
+              U
+            </div>
+          </div>
+        </header>
+
+        <div
+          className={cn(
+            'mx-auto flex min-h-[calc(100vh-72px)] max-w-4xl flex-col px-4 sm:px-6',
+            hasMessages ? 'py-6' : 'items-center justify-center py-12'
+          )}
+        >
+          {!hasMessages && (
+            <div className="w-full max-w-2xl space-y-6 text-center">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  What can I help you build?
+                </h1>
+                <p className="text-sm text-slate-600 sm:text-base">
+                  Ask Editorial OS to create, debug, or improve your projects.
+                </p>
+              </div>
+
+              <ChatInput
+                onSend={handleSendMessage}
+                placeholder="Ask Editorial OS to help..."
+                disabled={isLoading}
+              />
+
+              <QuickActions
+                actions={QUICK_ACTIONS}
+                onActionClick={handleQuickAction}
+              />
+            </div>
+          )}
+
+          {hasMessages && (
+            <>
+              <div className="flex-1 overflow-y-auto pb-4">
+                <ChatMessages messages={messages} isLoading={isLoading} />
+                <div ref={messagesEndRef} />
+              </div>
+              <div className="sticky bottom-0 border-t border-slate-200 bg-slate-50 pt-4 pb-6">
+                <ChatInput
+                  onSend={handleSendMessage}
+                  placeholder="Ask Editorial OS to help..."
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
