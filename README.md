@@ -1,194 +1,105 @@
-# Editorial OS
+# OS Brief
 
-AI-first operating system for content and communications. One chat, all tools.
+OS Brief is a SaaS product for structured campaign briefs. It handles
+collaboration, export, and automated delivery to Notion and Slack.
 
-## The Vision
+## Core Features
 
-```
-┌─────────────────────────────────────────────────┐
-│  ◈ Editorial OS                                 │
-├─────────────────────────────────────────────────┤
-│  [ Brief Engine ]  [ Campaign Deck ]  [ DAM ]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │ "Create a brief for EU eSIM launch..."   │  │
-│  └───────────────────────────────────────────┘  │
-│                                    [Send ✨]    │
-│                                                 │
-│  🤖 Editorial OS:                              │
-│  ✓ Brief created                               │
-│  ✓ Added to Campaign Deck (status: intake)     │
-│  ✓ Slack notified                              │
-│                                                 │
-│  [View Brief] [View in Deck] [Search DAM]      │
-└─────────────────────────────────────────────────┘
-```
+- Clerk auth + organizations (Admin / Editor / Viewer).
+- Create structured briefs with download export.
+- Archive every brief in Notion.
+- Realtime Slack message to #brief on creation.
+- Usage limits + audit logs.
+- Stripe billing with checkout + portal + webhook handling.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Copy environment variables
 cp .env.example .env.local
-
-# Start development server
 npm run dev
 ```
 
 ## Environment Variables
 
-**Required**: Set these in Vercel or your `.env.local`:
+See `.env.example` for the full list. Required values:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_BRIEF_ENGINE_URL` | Brief Engine deployment URL | `https://brief-engine.vercel.app` |
-| `NEXT_PUBLIC_CAMPAIGN_DECK_URL` | Campaign Deck deployment URL | `https://campaign-ledger.vercel.app` |
-| `NEXT_PUBLIC_LIGHT_DAM_URL` | Light DAM deployment URL | `https://light-dam-v1.vercel.app` |
+- Clerk
+  - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  - CLERK_SECRET_KEY
+- Supabase
+  - SUPABASE_URL
+  - SUPABASE_SERVICE_ROLE_KEY
+- Stripe
+  - STRIPE_SECRET_KEY
+  - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  - STRIPE_PRICE_MONTHLY_ID
+  - STRIPE_WEBHOOK_SECRET
+  - NEXT_PUBLIC_APP_URL
 
-## Deploy to Vercel
+## Supabase SQL (Milestones 2, 4, 5)
 
-### Option 1: Via GitHub
+```sql
+create table if not exists organization_integrations (
+  org_id text primary key,
+  notion_access_token text,
+  notion_workspace_id text,
+  notion_database_id text,
+  slack_access_token text,
+  slack_team_id text,
+  slack_channel_id text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 
-1. Push this repo to GitHub
-2. Import project in [Vercel Dashboard](https://vercel.com/new)
-3. Set environment variables in Project Settings → Environment Variables
-4. Deploy
+create table if not exists audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  org_id text not null,
+  user_id text not null,
+  action text not null,
+  details jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
 
-### Option 2: Via CLI
+create index if not exists audit_logs_org_id_idx on audit_logs (org_id);
+create index if not exists audit_logs_created_at_idx on audit_logs (created_at desc);
 
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login
-vercel login
-
-# Preview deploy (staging)
-vercel
-
-# Production deploy
-vercel --prod
+create table if not exists organization_billing (
+  org_id text primary key,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  status text,
+  price_id text,
+  current_period_end timestamptz,
+  trial_end timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 ```
 
-### Setting Environment Variables in Vercel
+## Notion Integration
 
-1. Go to your project in Vercel Dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add each variable:
-   - `NEXT_PUBLIC_BRIEF_ENGINE_URL` = your Brief Engine URL
-   - `NEXT_PUBLIC_CAMPAIGN_DECK_URL` = your Campaign Deck URL
-   - `NEXT_PUBLIC_LIGHT_DAM_URL` = your Light DAM URL
+1. Create a Notion integration and copy the token.
+2. Share the brief archive database with the integration.
+3. In OS Brief → Settings → Notion, enter the token and database ID.
 
-## How It Works
+The system auto-detects the title property and writes the brief details as page
+content if the database does not include matching fields.
 
-1. **You type** a natural language request
-2. **Router** determines which module handles it (Brief, Deck, DAM)
-3. **Executor** calls the appropriate API with timeout handling
-4. **Results** displayed with action buttons
+## Slack Integration
 
-## Connected Modules
+1. Create a Slack app with `chat:write` scope.
+2. Install the app, copy the bot token, and find the channel ID for #brief.
+3. In OS Brief → Settings → Slack, enter the token and channel ID.
 
-| Module | Purpose | URL |
-|--------|---------|-----|
-| Brief Engine | Create structured campaign briefs | `brief-engine.vercel.app` |
-| Campaign Deck | Track campaign lifecycle | `campaign-ledger.vercel.app` |
-| Light DAM | Search digital assets | `light-dam-v1.vercel.app` |
+## End-to-End Checklist
 
-## Example Queries
-
-**Creating briefs:**
-- "Create a brief for EU eSIM launch"
-- "New campaign for Q1 brand awareness targeting millennials"
-- "Make a brief called Holiday Sale for email and Instagram"
-
-**Checking campaigns:**
-- "Show me active campaigns"
-- "What's the status of the EU launch?"
-- "List all projects"
-
-**Finding assets:**
-- "Find hero images for Instagram"
-- "Search for travel photos"
-- "I need visuals for the EU campaign"
-
-## Architecture
-
-```
-User Query
-    ↓
-Editorial OS (API Route)
-    ↓
-Router (with 5s timeout)
-    ↓
-┌───────────┬───────────┬───────────┐
-│  Brief    │  Campaign │   Light   │
-│  Engine   │   Deck    │    DAM    │
-└───────────┴───────────┴───────────┘
-    ↓
-Results + Actions
-```
-
-## The Flow
-
-```
-"Create a brief for EU eSIM launch"
-    ↓
-API Route: POST /api/chat
-    ↓
-Router: module=brief, intent=create
-    ↓
-POST brief-engine.vercel.app/api/brief/create (5s timeout)
-    ↓
-Brief Engine: Creates brief + POSTs to Campaign Deck
-    ↓
-Campaign Deck: Creates ledger entry (intake)
-    ↓
-Editorial OS: "✓ Brief created. ✓ Added to Deck."
-    ↓
-Action buttons: [View Brief] [View in Deck]
-```
-
-## Project Structure
-
-```
-editorial-os/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts      # API endpoint for chat
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main chat interface
-├── components/
-│   ├── ChatInput.tsx         # Message input component
-│   ├── ChatMessage.tsx       # Message display component
-│   ├── ErrorBoundary.tsx     # Error handling wrapper
-│   └── ModuleTabs.tsx        # Module navigation tabs
-├── lib/
-│   ├── router.ts             # Query routing logic
-│   └── types.ts              # TypeScript types
-├── .env.example              # Environment variables template
-├── .gitignore
-├── next.config.js
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-└── tsconfig.json
-```
-
-## This is the Product
-
-Not individual tools. One unified interface.
-
-- **Solopreneur**: "Create a brief for my launch" → Done
-- **Marketing team**: "Show active campaigns" → Dashboard
-- **Agency**: "Find assets for client X" → Results
-
-All from one chat box.
+- Create a brief.
+- Download the exported brief file.
+- Confirm the Notion archive page was created.
+- Confirm the Slack message posted in #brief.
+- Verify audit logs in the Audit view.
 
 ---
 
-Part of Editorial OS. Built for content operations at any scale.
+Built for OS Brief. All milestones map to the SaaS launch plan.
