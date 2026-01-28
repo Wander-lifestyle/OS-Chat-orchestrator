@@ -7,6 +7,7 @@ type Message = {
   role: 'user' | 'assistant';
   content: string;
   tools?: ToolActivity[];
+  records?: RecordLinks;
 };
 
 type ToolActivity = {
@@ -25,7 +26,33 @@ type RunEditorialResponse = {
   status?: string;
   response?: string;
   tools?: ToolActivity[];
+  records?: RecordLinks;
 };
+
+type RecordLinks = {
+  outputUrl?: string;
+  ledgerUrl?: string;
+  ledgerStatus?: string;
+};
+
+type Track = 'newsletter' | 'social' | 'press_release';
+
+type RunSummary = {
+  ok: boolean;
+  at: string;
+  track: Track;
+  clientId?: string;
+  outputUrl?: string;
+  ledgerUrl?: string;
+  ledgerStatus?: string;
+  error?: string;
+};
+
+const TRACK_OPTIONS: Array<{ value: Track; label: string }> = [
+  { value: 'newsletter', label: 'Newsletter' },
+  { value: 'social', label: 'Social' },
+  { value: 'press_release', label: 'Press Release' },
+];
 
 const QUICK_ACTIONS = [
   { label: 'Run security audit' },
@@ -172,6 +199,39 @@ const ChatMessages = ({
               </ul>
             </div>
           )}
+          {(message.records?.outputUrl || message.records?.ledgerUrl) && (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+              <div className="font-medium text-slate-700">Notion links</div>
+              <ul className="mt-2 space-y-1">
+                {message.records?.outputUrl && (
+                  <li>
+                    Output:{' '}
+                    <a
+                      href={message.records.outputUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-slate-800"
+                    >
+                      View draft
+                    </a>
+                  </li>
+                )}
+                {message.records?.ledgerUrl && (
+                  <li>
+                    Ledger:{' '}
+                    <a
+                      href={message.records.ledgerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-slate-800"
+                    >
+                      View ledger
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     ))}
@@ -205,21 +265,33 @@ const QuickActions = ({
   </div>
 );
 
-const ProjectSidebar = ({
+const StatusSidebar = ({
   isOpen,
   onToggle,
+  isLoading,
+  track,
+  onTrackChange,
+  clientId,
+  onClientIdChange,
+  lastRun,
 }: {
   isOpen: boolean;
   onToggle: () => void;
+  isLoading: boolean;
+  track: Track;
+  onTrackChange: (value: Track) => void;
+  clientId: string;
+  onClientIdChange: (value: string) => void;
+  lastRun: RunSummary | null;
 }) => (
   <aside
     className={cn(
-      'fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-white shadow-sm transition-transform duration-300',
+      'fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white shadow-sm transition-transform duration-300',
       isOpen ? 'translate-x-0' : '-translate-x-full'
     )}
   >
     <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-      <span className="text-sm font-semibold text-slate-900">Projects</span>
+      <span className="text-sm font-semibold text-slate-900">Editorial OS</span>
       <button
         onClick={onToggle}
         className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600"
@@ -227,10 +299,105 @@ const ProjectSidebar = ({
         {isOpen ? 'Close' : 'Open'}
       </button>
     </div>
-    <div className="space-y-3 px-4 py-4 text-sm text-slate-600">
-      <p className="font-medium text-slate-900">Editorial OS</p>
-      <p>Bridge + Anthropic</p>
-      <p>Notion outputs</p>
+    <div className="space-y-6 px-4 py-4 text-sm text-slate-600">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Status
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={cn(
+              'h-2.5 w-2.5 rounded-full',
+              isLoading
+                ? 'bg-amber-500'
+                : lastRun
+                  ? lastRun.ok
+                    ? 'bg-emerald-500'
+                    : 'bg-rose-500'
+                  : 'bg-slate-300'
+            )}
+          />
+          <span className="text-slate-700">
+            {isLoading
+              ? 'Running'
+              : lastRun
+                ? lastRun.ok
+                  ? 'Ready'
+                  : 'Error'
+                : 'Idle'}
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Client ID
+        </div>
+        <input
+          type="text"
+          value={clientId}
+          onChange={(event) => onClientIdChange(event.target.value)}
+          placeholder="default"
+          className="mt-2 w-full rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-900"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Leave blank to use the default client.
+        </p>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Track
+        </div>
+        <select
+          value={track}
+          onChange={(event) => onTrackChange(event.target.value as Track)}
+          className="mt-2 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900"
+        >
+          {TRACK_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Last run
+        </div>
+        <div className="mt-2 space-y-1 text-sm text-slate-700">
+          <div>{lastRun ? lastRun.at : 'No runs yet'}</div>
+          {lastRun?.ledgerStatus && (
+            <div className="text-xs text-slate-500">
+              Ledger: {lastRun.ledgerStatus}
+            </div>
+          )}
+          {lastRun?.outputUrl && (
+            <a
+              href={lastRun.outputUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-500 underline hover:text-slate-700"
+            >
+              View output
+            </a>
+          )}
+          {lastRun?.ledgerUrl && (
+            <a
+              href={lastRun.ledgerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-500 underline hover:text-slate-700"
+            >
+              View ledger
+            </a>
+          )}
+          {lastRun?.error && (
+            <div className="text-xs text-rose-500">{lastRun.error}</div>
+          )}
+        </div>
+      </div>
     </div>
   </aside>
 );
@@ -240,6 +407,9 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [track, setTrack] = useState<Track>('newsletter');
+  const [clientId, setClientId] = useState('');
+  const [lastRun, setLastRun] = useState<RunSummary | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -270,7 +440,8 @@ export default function Home() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: trimmed,
-            track: 'newsletter',
+            track,
+            clientId: clientId.trim() || undefined,
           }),
         }
       );
@@ -283,6 +454,7 @@ export default function Home() {
       }
 
       const tools = Array.isArray(data?.tools) ? data?.tools : undefined;
+      const records = data?.records;
 
       if (!response.ok) {
         const assistantMessage: Message = {
@@ -290,8 +462,19 @@ export default function Home() {
           role: 'assistant',
           content: `Error: ${data?.response || response.statusText}`,
           tools,
+          records,
         };
         setMessages((prev) => [...prev, assistantMessage]);
+        setLastRun({
+          ok: false,
+          at: new Date().toLocaleTimeString(),
+          track,
+          clientId: clientId.trim() || undefined,
+          outputUrl: records?.outputUrl,
+          ledgerUrl: records?.ledgerUrl,
+          ledgerStatus: records?.ledgerStatus,
+          error: data?.response || response.statusText,
+        });
         return;
       }
 
@@ -300,8 +483,18 @@ export default function Home() {
         role: 'assistant',
         content: data?.response || 'Command completed with no output.',
         tools,
+        records,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      setLastRun({
+        ok: true,
+        at: new Date().toLocaleTimeString(),
+        track,
+        clientId: clientId.trim() || undefined,
+        outputUrl: records?.outputUrl,
+        ledgerUrl: records?.ledgerUrl,
+        ledgerStatus: records?.ledgerStatus,
+      });
     } catch (error) {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -312,6 +505,14 @@ export default function Home() {
             : 'Error: Unable to reach the bridge.',
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      setLastRun({
+        ok: false,
+        at: new Date().toLocaleTimeString(),
+        track,
+        clientId: clientId.trim() || undefined,
+        error:
+          error instanceof Error ? error.message : 'Unable to reach the bridge.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -325,15 +526,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <ProjectSidebar
+      <StatusSidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        isLoading={isLoading}
+        track={track}
+        onTrackChange={setTrack}
+        clientId={clientId}
+        onClientIdChange={setClientId}
+        lastRun={lastRun}
       />
 
       <main
         className={cn(
           'min-h-screen transition-all duration-300 ease-in-out',
-          sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'
+          sidebarOpen && !isMobile ? 'ml-72' : 'ml-0'
         )}
       >
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur sm:px-6">
