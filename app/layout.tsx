@@ -1,21 +1,22 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Editorial OS',
-  description: 'AI-first operating system for content and communications. One chat, all tools.',
-}
+  title: 'OS Brief',
+  description: 'Collaborative brief creation with Notion + Slack automation.',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
       <body className="grain antialiased">
-        {children}
+        <ClerkProvider>{children}</ClerkProvider>
       </body>
     </html>
-  )
+  );
 }
