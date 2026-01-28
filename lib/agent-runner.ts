@@ -60,6 +60,7 @@ const LEDGER_STATUS_IN_REVIEW =
   process.env.EDITORIAL_LEDGER_STATUS_IN_REVIEW || 'In Review';
 const LEDGER_STATUS_COMPLETED =
   process.env.EDITORIAL_LEDGER_STATUS_COMPLETED || 'Completed';
+const SLACK_NOTIFICATION_CHANNEL = process.env.SLACK_NOTIFICATION_CHANNEL;
 
 const extractText = (content: ContentBlock[]) =>
   content
@@ -218,6 +219,7 @@ export const runEditorialAgent = async ({
   const toolActivity: ToolActivity[] = [];
   const toolArtifacts: Array<{ label: string; url: string }> = [];
   let approvalRequired = false;
+  let slackNotified = false;
 
   for (const requirement of requirements) {
     const toolName = requirement.tool;
@@ -283,14 +285,34 @@ export const runEditorialAgent = async ({
     }
 
     if (toolName === 'post_slack_notification') {
+      const channel =
+        (requirement.input?.channel as string | undefined) ||
+        SLACK_NOTIFICATION_CHANNEL;
+      const message =
+        (requirement.input?.message as string | undefined) ||
+        `Editorial OS update: ${outputTitle}`;
+
+      if (!channel) {
+        toolActivity.push({
+          name: toolName,
+          ok: false,
+          summary: 'Slack channel not configured.',
+        });
+        continue;
+      }
+
       try {
-        const result = await postNotification(requirement.input as any);
+        const result = await postNotification({
+          channel,
+          message,
+        });
         toolActivity.push({
           name: toolName,
           ok: true,
           summary: result.summary,
           data: { id: result.id, status: result.status, channel: result.channel },
         });
+        slackNotified = true;
       } catch (error) {
         toolActivity.push({
           name: toolName,
@@ -314,6 +336,35 @@ export const runEditorialAgent = async ({
       ? 'Draft ready for approval.'
       : 'Draft completed.',
   });
+
+  if (SLACK_NOTIFICATION_CHANNEL && !slackNotified) {
+    const summaryLines = [
+      `Draft ready: ${outputTitle}`,
+      `Track: ${outputType}`,
+      outputRecord.url ? `Output: ${outputRecord.url}` : null,
+      ledgerEntry.url ? `Ledger: ${ledgerEntry.url}` : null,
+    ].filter(Boolean);
+
+    try {
+      const result = await postNotification({
+        channel: SLACK_NOTIFICATION_CHANNEL,
+        message: summaryLines.join('\n'),
+      });
+      toolActivity.push({
+        name: 'post_slack_notification',
+        ok: true,
+        summary: result.summary,
+        data: { id: result.id, status: result.status, channel: result.channel },
+      });
+    } catch (error) {
+      toolActivity.push({
+        name: 'post_slack_notification',
+        ok: false,
+        summary:
+          error instanceof Error ? error.message : 'Slack notification failed.',
+      });
+    }
+  }
 
   return {
     response: outputBody,

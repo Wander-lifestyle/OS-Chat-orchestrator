@@ -68,29 +68,14 @@ curl -X POST http://localhost:3000/api/run-editorial-os \
   -d '{"message":"Draft a newsletter intro","clientId":"wander","track":"newsletter"}'
 ```
 
-### POST /api/slack/events
+## Slack Notifications (Optional)
 
-Slack Events API endpoint for @mention support. Configure your Slack app
-to point its Request URL here. The handler verifies Slack signatures and
-responds in the same channel/thread.
+This build uses the web UI as the only interface, but can still post
+notifications to Slack when a draft is ready.
 
-## Slack Setup (App Mention)
-
-1. Create a Slack app in your workspace.
-2. Enable **Event Subscriptions** and set the Request URL to:
-   `https://<your-domain>/api/slack/events`
-3. Subscribe to the **app_mention** event.
-4. Add OAuth scopes:
-   - `chat:write`
-   - `app_mentions:read`
-5. Install the app to your workspace and invite it to the target channel.
-6. Set env vars:
-   - `SLACK_BOT_TOKEN`
-   - `SLACK_SIGNING_SECRET`
-   - `SLACK_DEFAULT_CHANNEL` (optional)
-   - `SLACK_DEFAULT_TRACK` (optional)
-   - `SLACK_DEFAULT_CLIENT_ID` (optional)
-   - `SLACK_CHANNEL_CLIENT_MAP` (optional JSON map)
+Set:
+- `SLACK_BOT_TOKEN`
+- `SLACK_NOTIFICATION_CHANNEL`
 
 ## Configuration
 
@@ -121,11 +106,7 @@ Environment variables:
 - `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID`, `BEEHIIV_API_BASE_URL`
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 - `SLACK_BOT_TOKEN`
-- `SLACK_SIGNING_SECRET`
-- `SLACK_DEFAULT_CHANNEL`
-- `SLACK_DEFAULT_TRACK`
-- `SLACK_DEFAULT_CLIENT_ID`
-- `SLACK_CHANNEL_CLIENT_MAP`
+- `SLACK_NOTIFICATION_CHANNEL`
 - `EDITORIAL_OUTPUT_STATUS_IN_REVIEW`
 - `EDITORIAL_LEDGER_STATUS_IN_PROGRESS`
 - `EDITORIAL_LEDGER_STATUS_IN_REVIEW`
