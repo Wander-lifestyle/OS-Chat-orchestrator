@@ -523,10 +523,10 @@ export default function LightDamPage() {
           <div className="mx-auto max-w-6xl px-6 py-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.3em] text-os-muted">Light DAM</p>
+                <p className="text-[11px] uppercase tracking-[0.3em] text-os-muted">PixelSky</p>
                 <h1 className="text-4xl font-semibold tracking-tight">Searchable asset library</h1>
                 <p className="text-sm text-os-muted">
-                  Quick, human-friendly search over your Cloudinary-backed assets.
+                  Light DAM for fast, AI-native asset management.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-os-muted">

@@ -42,7 +42,7 @@ type DamAsset = {
 
 const DEFAULT_LIMIT = 48;
 const MAX_LIMIT = 100;
-const MAX_FETCH = 100; // Light DAM targets small libraries (20-50 assets)
+const MAX_FETCH = 100; // PixelSky (Light DAM) targets small libraries (20-50 assets)
 
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'for', 'to', 'and', 'or', 'with', 'of', 'in', 'on', 'at',

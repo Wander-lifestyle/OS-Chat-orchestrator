@@ -1,6 +1,6 @@
-# Light DAM
+# PixelSky (Light DAM)
 
-Light DAM is a lightweight digital asset manager designed for small marketing teams
+PixelSky is a lightweight digital asset manager (Light DAM) designed for small marketing teams
 who need a fast, searchable library of images (20-50 assets, not thousands). It uses
 Cloudinary as the single source of truth for storage, metadata, previews, and download
 links.
@@ -57,7 +57,7 @@ Create a `.env.local` file or configure these in Vercel:
 
 ## Authentication (Milestone 1)
 
-Light DAM uses Clerk for authentication and organizations. Create a Clerk app, then set:
+PixelSky uses Clerk for authentication and organizations. Create a Clerk app, then set:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
@@ -175,7 +175,7 @@ Visit `/audit` to view the latest events.
 
 ## Metadata Conventions
 
-Light DAM reads metadata from either Cloudinary **context** or **structured metadata**.
+PixelSky reads metadata from either Cloudinary **context** or **structured metadata**.
 Populate any of these fields to power searching and UI labels:
 
 - `asset_id` (for image number searches)

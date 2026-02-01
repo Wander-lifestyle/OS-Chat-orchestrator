@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const org = await client.organizations.getOrganization({ organizationId: orgId });
     const customer = await stripe.customers.create({
       email: user.emailAddresses?.[0]?.emailAddress,
-      name: org.name ?? 'Light DAM Workspace',
+      name: org.name ?? 'PixelSky Workspace',
       metadata: {
         orgId,
         userId,

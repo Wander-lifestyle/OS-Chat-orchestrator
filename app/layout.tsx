@@ -4,8 +4,8 @@ import { ClerkProvider } from '@clerk/nextjs'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Light DAM',
-  description: 'Lightweight digital asset manager powered by Cloudinary.',
+  title: 'PixelSky — Light DAM',
+  description: 'PixelSky is a Light DAM for fast, AI-native asset management.',
 }
 
 export default function RootLayout({

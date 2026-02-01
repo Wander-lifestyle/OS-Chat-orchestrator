@@ -257,7 +257,7 @@ Just tell me what you need - I'll orchestrate everything behind the scenes.`,
             >
               <span className="text-lg">🖼️</span>
               <div>
-                <div className="font-medium text-green-900">Light DAM</div>
+                <div className="font-medium text-green-900">PixelSky</div>
                 <div className="text-sm text-green-600">Manage assets</div>
               </div>
             </a>
@@ -399,7 +399,7 @@ Just tell me what you need - I'll orchestrate everything behind the scenes.`,
             {/* Footer */}
             <div className="text-center mt-3">
               <p className="text-xs text-slate-500">
-                Connected to Brief Engine • Campaign Ledger • Light DAM
+                Connected to Brief Engine • Campaign Ledger • PixelSky
               </p>
             </div>
           </div>

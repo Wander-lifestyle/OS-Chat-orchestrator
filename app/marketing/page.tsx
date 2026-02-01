@@ -18,7 +18,7 @@ export default function MarketingPage() {
       <header className="border-b border-black/5 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold tracking-wide">Light DAM</span>
+            <span className="text-sm font-semibold tracking-wide">PixelSky</span>
             <span className="rounded-full border border-black/10 bg-os-bg px-2 py-0.5 text-[10px] text-os-muted">
               Beta
             </span>
@@ -45,12 +45,12 @@ export default function MarketingPage() {
           <div className="mx-auto max-w-6xl px-6 py-16">
             <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
               <div className="space-y-6">
-                <p className="text-xs uppercase tracking-[0.3em] text-os-muted">Light DAM</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-os-muted">PixelSky</p>
                 <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
                   An AI-native DAM for small teams
                 </h1>
                 <p className="text-base text-os-muted">
-                  Ask the DAM, generate campaign-ready crops, and keep metadata clean.
+                  PixelSky is a Light DAM. Ask the DAM, generate campaign-ready crops, and keep metadata clean.
                   Built for marketing teams, agencies, solopreneurs, and small tourism boards.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -154,7 +154,7 @@ export default function MarketingPage() {
                 <p className="text-xs uppercase tracking-[0.3em] text-os-muted">Waitlist</p>
                 <h2 className="text-3xl font-semibold">Join early access</h2>
                 <p className="mt-2 text-sm text-os-muted">
-                  Be first in line when Light DAM opens to new teams.
+                  Be first in line when PixelSky opens to new teams.
                 </p>
               </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -184,7 +184,7 @@ export default function MarketingPage() {
 
       <footer className="border-t border-black/5 bg-white/80">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-os-muted sm:flex-row sm:items-center sm:justify-between">
-          <span>Light DAM - lightweight digital asset management</span>
+          <span>PixelSky — Light DAM for small teams</span>
           <span>Built for small teams</span>
         </div>
       </footer>

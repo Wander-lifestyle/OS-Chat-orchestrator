@@ -16,7 +16,7 @@ export default function BillingSuccessPage() {
               href="/"
               className="rounded-full bg-os-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600"
             >
-              Go to Light DAM
+              Go to PixelSky
             </Link>
             <Link
               href="/billing"

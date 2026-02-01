@@ -19,7 +19,7 @@ export default function OnboardingPage() {
               href="/"
               className="mt-6 inline-flex rounded-full bg-os-accent px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600"
             >
-              Open Light DAM
+              Open PixelSky
             </Link>
           </div>
         </div>
