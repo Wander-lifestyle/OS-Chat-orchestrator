@@ -293,7 +293,7 @@ async function executeDeckAction(
   };
 }
 
-// Light DAM actions
+// PixelSky actions
 async function executeDamAction(
   route: RouteResult,
   query: string,
@@ -303,7 +303,7 @@ async function executeDamAction(
   return {
     success: true,
     module: 'dam',
-    message: `I'll help you find assets. Opening Light DAM with your search.`,
+    message: `I'll help you find assets. Opening PixelSky with your search.`,
     actions: [{ label: 'Search in DAM', url: baseUrl }],
   };
 }

@@ -30,7 +30,7 @@ export const MODULES: Module[] = [
   },
   {
     id: 'dam',
-    name: 'Light DAM',
+    name: 'PixelSky',
     description: 'Search and manage digital assets',
     icon: '🖼️',
     url: process.env.NEXT_PUBLIC_LIGHT_DAM_URL || 'https://light-dam-v1.vercel.app',

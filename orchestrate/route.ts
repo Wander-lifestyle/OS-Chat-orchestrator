@@ -354,7 +354,7 @@ async function handleQuery(message: string): Promise<OrchestrationResponse> {
 
     case 'HELP':
       return {
-        response: `🤖 **How to use Editorial OS**\n\n**Launch campaigns:**\n• "Launch campaign for Europe eSIM with newsletter and social"\n• "Create Q2 product announcement across all channels"\n\n**Track & manage:**\n• "Show me active campaigns"\n• "Find hero images for Instagram"\n\n**Manual access:**\n• Brief Engine: Create detailed campaign briefs\n• Campaign Ledger: Track progress and state\n• Light DAM: Search and manage assets\n\nJust tell me what you need in natural language!`,
+        response: `🤖 **How to use Editorial OS**\n\n**Launch campaigns:**\n• "Launch campaign for Europe eSIM with newsletter and social"\n• "Create Q2 product announcement across all channels"\n\n**Track & manage:**\n• "Show me active campaigns"\n• "Find hero images for Instagram"\n\n**Manual access:**\n• Brief Engine: Create detailed campaign briefs\n• Campaign Ledger: Track progress and state\n• PixelSky (Light DAM): Search and manage assets\n\nJust tell me what you need in natural language!`,
         progress: [],
         results: {
           success: true,
