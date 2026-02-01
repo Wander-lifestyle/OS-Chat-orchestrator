@@ -1,21 +1,19 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Editorial OS',
-  description: 'AI-first operating system for content and communications. One chat, all tools.',
-}
+  title: 'Light Brief',
+  description: 'Minimal brief capture with Slack notification and PDF export.',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <body className="grain antialiased">
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
-  )
+  );
 }
