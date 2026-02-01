@@ -14,14 +14,14 @@ const config: Config = {
       },
       colors: {
         os: {
-          bg: '#f5f5f7',
-          surface: '#ffffff',
-          border: '#d2d2d7',
-          muted: '#6e6e73',
-          text: '#1d1d1f',
-          accent: '#0071e3',
-          success: '#1d7f4d',
-          warning: '#bf4800',
+          bg: '#efede8',
+          surface: '#f7f5f0',
+          border: '#dad4ca',
+          muted: '#7a736b',
+          text: '#1f1b16',
+          accent: '#3b6b7a',
+          success: '#2e7d5b',
+          warning: '#b46a2d',
         },
       },
       animation: {

@@ -18,8 +18,8 @@ html {
 }
 
 body {
-  background: #f5f5f7;
-  color: #1d1d1f;
+  background: #efede8;
+  color: #1f1b16;
   min-height: 100vh;
 }
 
@@ -30,34 +30,50 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f0f0f2;
+  background: #ebe7e0;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c7c7cc;
+  background: #c9c2b8;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a6;
+  background: #b2aba1;
 }
 
 /* Gradient background */
 .gradient-bg {
-  background: radial-gradient(ellipse at top, #ffffff 0%, #f5f5f7 60%);
+  background: radial-gradient(ellipse at top, #f7f5f0 0%, #efede8 60%);
 }
 
 /* Chat input glow */
 .chat-input-glow {
-  box-shadow: 0 0 0 1px rgba(0, 113, 227, 0.2),
-              0 0 20px rgba(0, 113, 227, 0.08),
-              0 0 40px rgba(0, 113, 227, 0.05);
+  box-shadow: none;
 }
 
 .chat-input-glow:focus-within {
-  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.35),
-              0 0 30px rgba(0, 113, 227, 0.2),
-              0 0 60px rgba(0, 113, 227, 0.1);
+  box-shadow: none;
+}
+
+/* Remove floating shadows for minimal UI */
+.shadow,
+.shadow-sm,
+.shadow-md,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl,
+.shadow-inner {
+  box-shadow: none !important;
+}
+
+/* Warm, minimal surfaces */
+.bg-white {
+  background-color: #f7f5f0 !important;
+}
+
+.bg-white\/80 {
+  background-color: rgba(247, 245, 240, 0.8) !important;
 }
 
 /* Message animations */
