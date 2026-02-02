@@ -1,0 +1,10 @@
+{
+  "id": "evergreen-demo",
+  "name": "Newsletter Demo",
+  "context": {
+    "brand": "A weekly newsletter for [topic]. Adjust based on uploaded docs.",
+    "audience": "General audience interested in [topic]. Adjust based on uploaded context.",
+    "voice": "Warm, conversational, first-person when appropriate. Clear and accessible.",
+    "constraints": "Keep content practical and actionable. Avoid jargon unless explained."
+  }
+}

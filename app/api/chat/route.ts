@@ -1,149 +1,77 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
-import { tools } from '@/lib/tools/definitions';
-import { executeTool } from '@/lib/tools/executor';
-import { loadAllPrompts } from '@/lib/prompts/loader';
-import { getSupabaseClient, isSupabaseConfigured } from '@/lib/db/client';
-import { ChatMessage } from '@/types/index';
+import { streamClaudeResponse } from '@/lib/claude';
+import { extractTextFromFiles, formatExtractedFiles, UploadedFile } from '@/lib/files';
+import { loadNewsletterSkills } from '@/lib/skills';
+import { buildSystemPrompt, loadClientConfig } from '@/lib/prompts';
 
 export const runtime = 'nodejs';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
-const MODEL = 'claude-3-5-sonnet-latest';
-const MAX_TOOL_LOOPS = 8;
+interface ChatRequestBody {
+  message: string;
+  files?: UploadedFile[];
+  conversationHistory?: ConversationMessage[];
+}
+
+const isConversationMessage = (value: unknown): value is ConversationMessage => {
+  if (!value || typeof value !== 'object') return false;
+  const message = value as ConversationMessage;
+  return (
+    (message.role === 'user' || message.role === 'assistant') &&
+    typeof message.content === 'string'
+  );
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = (await request.json()) as {
-      messages: ChatMessage[];
-    };
+    const body = (await request.json()) as ChatRequestBody;
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+    const files = Array.isArray(body?.files) ? body.files : [];
+    const conversationHistory = Array.isArray(body?.conversationHistory)
+      ? body.conversationHistory
+      : [];
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!message) {
       return NextResponse.json(
-        { error: 'Messages array is required' },
+        { error: 'Message is required.' },
         { status: 400 }
       );
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: 'Anthropic API key is not configured' },
-        { status: 500 }
-      );
-    }
+    const config = loadClientConfig();
+    const skills = loadNewsletterSkills();
+    const systemPrompt = buildSystemPrompt(config, skills);
 
-    const systemPrompt = await loadAllPrompts();
+    const extractedFiles = await extractTextFromFiles(files);
+    const fileContext = formatExtractedFiles(extractedFiles);
+    const userMessage = [message, fileContext].filter(Boolean).join('\n\n');
 
-    const conversation: Anthropic.MessageParam[] = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    const history: Anthropic.MessageParam[] = conversationHistory
+      .filter(isConversationMessage)
+      .map((entry) => ({
+        role: entry.role,
+        content: entry.content,
+      }));
 
-    let response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1600,
-      system: systemPrompt,
-      tools,
-      messages: conversation,
+    const messages: Anthropic.MessageParam[] = [
+      ...history,
+      { role: 'user', content: userMessage },
+    ];
+
+    const stream = await streamClaudeResponse({ system: systemPrompt, messages });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
     });
-
-    const toolNames: string[] = [];
-    const createdBriefs: string[] = [];
-    const createdNewsletters: string[] = [];
-    const ledgerIds: string[] = [];
-
-    let loops = 0;
-    while (response.stop_reason === 'tool_use' && loops < MAX_TOOL_LOOPS) {
-      loops += 1;
-      const toolUseBlocks = response.content.filter(
-        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-      );
-
-      if (toolUseBlocks.length === 0) break;
-
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-      for (const toolUse of toolUseBlocks) {
-        try {
-          const result = await executeTool(
-            toolUse.name,
-            toolUse.input as Record<string, unknown>
-          );
-          toolNames.push(toolUse.name);
-
-          if (toolUse.name === 'create_brief' && result && typeof result === 'object') {
-            const briefResult = result as { uuid?: string; ledger_id?: string };
-            if (briefResult.uuid) createdBriefs.push(briefResult.uuid);
-            if (briefResult.ledger_id) ledgerIds.push(briefResult.ledger_id);
-          }
-
-          if (toolUse.name === 'create_newsletter' && result && typeof result === 'object') {
-            const newsletterResult = result as { draft_id?: string; ledger_id?: string };
-            if (newsletterResult.draft_id) createdNewsletters.push(newsletterResult.draft_id);
-            if (newsletterResult.ledger_id) ledgerIds.push(newsletterResult.ledger_id);
-          }
-
-          if (toolUse.name === 'update_campaign' && result && typeof result === 'object') {
-            const campaignResult = result as { ledger_id?: string };
-            if (campaignResult.ledger_id) ledgerIds.push(campaignResult.ledger_id);
-          }
-
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: JSON.stringify(result),
-          });
-        } catch (error) {
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: JSON.stringify({
-              error: error instanceof Error ? error.message : 'Tool execution failed',
-            }),
-            is_error: true,
-          });
-        }
-      }
-
-      conversation.push({ role: 'assistant', content: response.content });
-      conversation.push({ role: 'user', content: toolResults });
-
-      response = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: 1600,
-        system: systemPrompt,
-        tools,
-        messages: conversation,
-      });
-    }
-
-    const textBlocks = response.content.filter(
-      (block): block is Anthropic.TextBlock => block.type === 'text'
-    );
-    const finalMessage = textBlocks.map((block) => block.text).join('\n');
-
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        return NextResponse.json({ message: finalMessage });
-      }
-      const lastUser = messages.filter((msg) => msg.role === 'user').pop();
-      if (lastUser) {
-        await supabase.from('chat_history').insert({
-          user_message: lastUser.content,
-          assistant_response: finalMessage,
-          tools_used: toolNames,
-          created_briefs: createdBriefs.length > 0 ? createdBriefs : null,
-          created_newsletters: createdNewsletters.length > 0 ? createdNewsletters : null,
-          ledger_ids: ledgerIds.length > 0 ? ledgerIds : null,
-        });
-      }
-    }
-
-    return NextResponse.json({ message: finalMessage });
   } catch (error) {
     console.error('Chat API error:', error);
     return NextResponse.json(
