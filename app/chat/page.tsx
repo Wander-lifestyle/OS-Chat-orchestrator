@@ -334,16 +334,25 @@ export default function ChatPage() {
                                   {children}
                                 </ol>
                               ),
-                              code: ({ inline, children }) =>
-                                inline ? (
-                                  <code className="rounded bg-[#f2ede6] px-1 py-0.5 text-xs text-[#6b5f54]">
+                              pre: ({ children }) => (
+                                <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#f2ede6] p-4 text-xs text-[#4a4037]">
+                                  {children}
+                                </pre>
+                              ),
+                              code: ({ className, children }) => {
+                                const isBlock = Boolean(className);
+                                return (
+                                  <code
+                                    className={
+                                      isBlock
+                                        ? 'text-xs text-[#4a4037]'
+                                        : 'rounded bg-[#f2ede6] px-1 py-0.5 text-xs text-[#6b5f54]'
+                                    }
+                                  >
                                     {children}
                                   </code>
-                                ) : (
-                                  <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#f2ede6] p-4 text-xs text-[#4a4037]">
-                                    <code>{children}</code>
-                                  </pre>
-                                ),
+                                );
+                              },
                             }}
                           >
                             {message.content || (message.status === 'streaming' ? '...' : '')}
