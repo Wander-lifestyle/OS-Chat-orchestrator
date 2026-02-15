@@ -11,13 +11,39 @@ const anthropic = new Anthropic({
 interface StreamParams {
   system: string;
   messages: Anthropic.MessageParam[];
+  tools?: Anthropic.Tool[];
   model?: string;
   maxTokens?: number;
+}
+
+interface CreateParams extends StreamParams {
+  stream?: boolean;
+}
+
+export async function createClaudeMessage({
+  system,
+  messages,
+  tools,
+  model = MODEL,
+  maxTokens = 1600,
+}: CreateParams) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic API key is not configured');
+  }
+
+  return anthropic.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages,
+    tools,
+  });
 }
 
 export async function streamClaudeResponse({
   system,
   messages,
+  tools,
   model = MODEL,
   maxTokens = 1600,
 }: StreamParams): Promise<ReadableStream<Uint8Array>> {
@@ -30,6 +56,7 @@ export async function streamClaudeResponse({
     max_tokens: maxTokens,
     system,
     messages,
+    tools,
     stream: true,
   });
 
@@ -61,3 +88,17 @@ export async function streamClaudeResponse({
     },
   });
 }
+
+export const streamText = (text: string) => {
+  const encoder = new TextEncoder();
+  const chunkSize = 1200;
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let i = 0; i < text.length; i += chunkSize) {
+        controller.enqueue(encoder.encode(text.slice(i, i + chunkSize)));
+      }
+      controller.close();
+    },
+  });
+};
