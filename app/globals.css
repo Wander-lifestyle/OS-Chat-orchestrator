@@ -18,8 +18,8 @@ html {
 }
 
 body {
-  background: #09090b;
-  color: #fafafa;
+  background: #f7f4ef;
+  color: #1f1c18;
   min-height: 100vh;
 }
 
@@ -30,16 +30,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #18181b;
+  background: #eee6dd;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #c9beb3;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: #b8aca0;
 }
 
 /* Gradient background */

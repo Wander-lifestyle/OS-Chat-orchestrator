@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Editorial OS',
-  description: 'AI-first operating system for content and communications. One chat, all tools.',
+  description: 'Newsletter chat interface for client-facing production.',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="grain antialiased">
+      <body className="antialiased">
         {children}
       </body>
     </html>
